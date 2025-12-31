@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Editable Color Matrix Filter</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: #0f0f0f;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 20px;
+            padding: 20px;
+            background: #1a1a1a;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, .4);
+        }
+
+        img {
+            max-width: 320px;
+            max-height: 320px;
+            border-radius: 10px;
+            background: #000;
+            object-fit: contain;
+            filter: url(#rnColorMatrix);
+        }
+
+        input[type="file"] {
+            margin-bottom: 12px;
+        }
+
+        .matrix {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 6px;
+        }
+
+        .matrix input {
+            width: 60px;
+            padding: 6px;
+            border-radius: 6px;
+            border: none;
+            text-align: center;
+            font-size: 13px;
+        }
+
+        button {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            background: #1e88e5;
+            color: white;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .hint {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- SVG FILTER -->
+    <svg width="0" height="0" aria-hidden="true">
+        <defs>
+            <filter id="rnColorMatrix">
+                <feColorMatrix id="colorMatrix" type="matrix" values="" />
+            </filter>
+        </defs>
+    </svg>
+
+    <div class="container">
+
+        <!-- LEFT: IMAGE -->
+        <div>
+            <input type="file" accept="image/*" id="fileInput" />
+            <img id="preview" />
+        </div>
+
+        <!-- RIGHT: MATRIX CONTROLS -->
+        <div class="controls">
+
+            <div class="matrix" id="matrixInputs"></div>
+
+            <button onclick="resetMatrix()">Reset to Default</button>
+
+            <div class="hint">
+                Matrix order: 4 rows × 5 columns (RGBA)
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const defaultMatrix = [
+            [-1.1, 0, 0, 0, 1],
+            [-0.1, -1, 0, 0, 1],
+            [0, 0, -1.3, 0, 1],
+            [0, 0, 0, 1, 0]
+        ];
+
+        const matrixInputs = document.getElementById('matrixInputs');
+        const feMatrix = document.getElementById('colorMatrix');
+        const preview = document.getElementById('preview');
+        const fileInput = document.getElementById('fileInput');
+
+        function buildInputs() {
+            matrixInputs.innerHTML = '';
+            defaultMatrix.flat().forEach((value, index) => {
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.step = '0.1';
+                input.value = value;
+                input.dataset.index = index;
+                input.oninput = updateMatrix;
+                matrixInputs.appendChild(input);
+            });
+        }
+
+        function updateMatrix() {
+            const values = [...matrixInputs.children]
+                .map(input => input.value || 0)
+                .join(' ');
+            feMatrix.setAttribute('values', values);
+        }
+
+        function resetMatrix() {
+            buildInputs();
+            updateMatrix();
+        }
+
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = e => preview.src = e.target.result;
+            reader.readAsDataURL(file);
+        });
+
+        // Init
+        buildInputs();
+        updateMatrix();
+    </script>
+
+</body>
+
+</html>
