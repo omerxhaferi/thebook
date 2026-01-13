@@ -1,11 +1,12 @@
 import { useTheme } from '@/app/context/ThemeContext';
-import { SURAHS, Surah } from '@/constants/surahs';
+import { SURAHS, Surah, getJuzNumber } from '@/constants/surahs';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   FlatList,
+  Platform,
   StatusBar,
   StyleSheet,
   Text,
@@ -50,10 +51,13 @@ export default function SurahsScreen() {
 
       <View style={styles.surahInfo}>
         <Text style={[styles.surahArabicName, { color: theme.text }]}>{getTranslatedSurahName(item)}</Text>
-        <Text style={[styles.surahEnglishName, { color: theme.secondaryText }]}>{item.name}</Text>
         <View style={styles.surahMeta}>
           <Text style={[styles.surahMetaText, { color: theme.secondaryText }]}>
             {item.verses} {t('verses')}
+          </Text>
+          <View style={{ width: 3, height: 3, borderRadius: 1.5, backgroundColor: theme.secondaryText, marginHorizontal: 8, opacity: 0.5 }} />
+          <Text style={[styles.surahMetaText, { color: theme.secondaryText }]}>
+            {t('juz')}: {getJuzNumber(item.startPage)}
           </Text>
         </View>
       </View>
@@ -68,7 +72,10 @@ export default function SurahsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView
+        style={styles.safeArea}
+        edges={Platform.OS === 'android' ? ['top', 'bottom', 'left', 'right'] : ['top', 'bottom']}
+      >
         <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={28} color={theme.primary} />

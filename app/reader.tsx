@@ -1,11 +1,14 @@
 import { useTheme } from '@/app/context/ThemeContext';
-import { getSurahsOnPage } from '@/constants/surahs';
+import DownloadModal from '@/components/DownloadModal';
+import { getJuzNumber, getSurahsOnPage } from '@/constants/surahs';
+import { DownloadService } from '@/services/DownloadService';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
+import { Paths } from 'expo-file-system';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   AppState,
@@ -18,7 +21,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -28,654 +31,18 @@ import Svg, { Defs, FeColorMatrix, Filter, Image as SvgImage } from 'react-nativ
 // Generate all page names from 'aa' to 'xl'
 function generatePageNames(): string[] {
   const pages: string[] = [];
-  const firstLetters = 'abcdefghijklmnopqrstuvwx'; // a to x
-  const secondLetters = 'abcdefghijklmnopqrstuvwxyz'; // a to z
-
-  for (let i = 0; i < firstLetters.length; i++) {
-    const firstLetter = firstLetters[i];
-    // For 'x', only go up to 'l', otherwise go to 'z'
-    const maxSecondLetter = firstLetter === 'x' ? 'l' : 'z';
-    const maxIndex = secondLetters.indexOf(maxSecondLetter);
-
-    for (let j = 0; j <= maxIndex; j++) {
-      pages.push(firstLetter + secondLetters[j]);
-    }
+  // Generate page names from 001 to 611
+  for (let i = 1; i <= 609; i++) {
+    pages.push(i.toString().padStart(3, '0'));
   }
-
-  // Insert 'ozz' after 'oz' and before 'pa'
-  const ozIndex = pages.indexOf('oz');
-  if (ozIndex !== -1) {
-    pages.splice(ozIndex + 1, 0, 'ozz');
-  }
-
   return pages;
-}
-
-// Helper function to get image source dynamically
-function getImageSource(pageName: string) {
-  const images: { [key: string]: any } = {
-    'aa': require('@/assets/pages/aa.jpg'),
-    'ab': require('@/assets/pages/ab.jpg'),
-    'ac': require('@/assets/pages/ac.jpg'),
-    'ad': require('@/assets/pages/ad.jpg'),
-    'ae': require('@/assets/pages/ae.jpg'),
-    'af': require('@/assets/pages/af.jpg'),
-    'ag': require('@/assets/pages/ag.jpg'),
-    'ah': require('@/assets/pages/ah.jpg'),
-    'ai': require('@/assets/pages/ai.jpg'),
-    'aj': require('@/assets/pages/aj.jpg'),
-    'ak': require('@/assets/pages/ak.jpg'),
-    'al': require('@/assets/pages/al.jpg'),
-    'am': require('@/assets/pages/am.jpg'),
-    'an': require('@/assets/pages/an.jpg'),
-    'ao': require('@/assets/pages/ao.jpg'),
-    'ap': require('@/assets/pages/ap.jpg'),
-    'aq': require('@/assets/pages/aq.jpg'),
-    'ar': require('@/assets/pages/ar.jpg'),
-    'as': require('@/assets/pages/as.jpg'),
-    'at': require('@/assets/pages/at.jpg'),
-    'au': require('@/assets/pages/au.jpg'),
-    'av': require('@/assets/pages/av.jpg'),
-    'aw': require('@/assets/pages/aw.jpg'),
-    'ax': require('@/assets/pages/ax.jpg'),
-    'ay': require('@/assets/pages/ay.jpg'),
-    'az': require('@/assets/pages/az.jpg'),
-    'ba': require('@/assets/pages/ba.jpg'),
-    'bb': require('@/assets/pages/bb.jpg'),
-    'bc': require('@/assets/pages/bc.jpg'),
-    'bd': require('@/assets/pages/bd.jpg'),
-    'be': require('@/assets/pages/be.jpg'),
-    'bf': require('@/assets/pages/bf.jpg'),
-    'bg': require('@/assets/pages/bg.jpg'),
-    'bh': require('@/assets/pages/bh.jpg'),
-    'bi': require('@/assets/pages/bi.jpg'),
-    'bj': require('@/assets/pages/bj.jpg'),
-    'bk': require('@/assets/pages/bk.jpg'),
-    'bl': require('@/assets/pages/bl.jpg'),
-    'bm': require('@/assets/pages/bm.jpg'),
-    'bn': require('@/assets/pages/bn.jpg'),
-    'bo': require('@/assets/pages/bo.jpg'),
-    'bp': require('@/assets/pages/bp.jpg'),
-    'bq': require('@/assets/pages/bq.jpg'),
-    'br': require('@/assets/pages/br.jpg'),
-    'bs': require('@/assets/pages/bs.jpg'),
-    'bt': require('@/assets/pages/bt.jpg'),
-    'bu': require('@/assets/pages/bu.jpg'),
-    'bv': require('@/assets/pages/bv.jpg'),
-    'bw': require('@/assets/pages/bw.jpg'),
-    'bx': require('@/assets/pages/bx.jpg'),
-    'by': require('@/assets/pages/by.jpg'),
-    'bz': require('@/assets/pages/bz.jpg'),
-    'ca': require('@/assets/pages/ca.jpg'),
-    'cb': require('@/assets/pages/cb.jpg'),
-    'cc': require('@/assets/pages/cc.jpg'),
-    'cd': require('@/assets/pages/cd.jpg'),
-    'ce': require('@/assets/pages/ce.jpg'),
-    'cf': require('@/assets/pages/cf.jpg'),
-    'cg': require('@/assets/pages/cg.jpg'),
-    'ch': require('@/assets/pages/ch.jpg'),
-    'ci': require('@/assets/pages/ci.jpg'),
-    'cj': require('@/assets/pages/cj.jpg'),
-    'ck': require('@/assets/pages/ck.jpg'),
-    'cl': require('@/assets/pages/cl.jpg'),
-    'cm': require('@/assets/pages/cm.jpg'),
-    'cn': require('@/assets/pages/cn.jpg'),
-    'co': require('@/assets/pages/co.jpg'),
-    'cp': require('@/assets/pages/cp.jpg'),
-    'cq': require('@/assets/pages/cq.jpg'),
-    'cr': require('@/assets/pages/cr.jpg'),
-    'cs': require('@/assets/pages/cs.jpg'),
-    'ct': require('@/assets/pages/ct.jpg'),
-    'cu': require('@/assets/pages/cu.jpg'),
-    'cv': require('@/assets/pages/cv.jpg'),
-    'cw': require('@/assets/pages/cw.jpg'),
-    'cx': require('@/assets/pages/cx.jpg'),
-    'cy': require('@/assets/pages/cy.jpg'),
-    'cz': require('@/assets/pages/cz.jpg'),
-    'da': require('@/assets/pages/da.jpg'),
-    'db': require('@/assets/pages/db.jpg'),
-    'dc': require('@/assets/pages/dc.jpg'),
-    'dd': require('@/assets/pages/dd.jpg'),
-    'de': require('@/assets/pages/de.jpg'),
-    'df': require('@/assets/pages/df.jpg'),
-    'dg': require('@/assets/pages/dg.jpg'),
-    'dh': require('@/assets/pages/dh.jpg'),
-    'di': require('@/assets/pages/di.jpg'),
-    'dj': require('@/assets/pages/dj.jpg'),
-    'dk': require('@/assets/pages/dk.jpg'),
-    'dl': require('@/assets/pages/dl.jpg'),
-    'dm': require('@/assets/pages/dm.jpg'),
-    'dn': require('@/assets/pages/dn.jpg'),
-    'do': require('@/assets/pages/doo.jpg'),
-    'dp': require('@/assets/pages/dp.jpg'),
-    'dq': require('@/assets/pages/dq.jpg'),
-    'dr': require('@/assets/pages/dr.jpg'),
-    'ds': require('@/assets/pages/ds.jpg'),
-    'dt': require('@/assets/pages/dt.jpg'),
-    'du': require('@/assets/pages/du.jpg'),
-    'dv': require('@/assets/pages/dv.jpg'),
-    'dw': require('@/assets/pages/dw.jpg'),
-    'dx': require('@/assets/pages/dx.jpg'),
-    'dy': require('@/assets/pages/dy.jpg'),
-    'dz': require('@/assets/pages/dz.jpg'),
-    'ea': require('@/assets/pages/ea.jpg'),
-    'eb': require('@/assets/pages/eb.jpg'),
-    'ec': require('@/assets/pages/ec.jpg'),
-    'ed': require('@/assets/pages/ed.jpg'),
-    'ee': require('@/assets/pages/ee.jpg'),
-    'ef': require('@/assets/pages/ef.jpg'),
-    'eg': require('@/assets/pages/eg.jpg'),
-    'eh': require('@/assets/pages/eh.jpg'),
-    'ei': require('@/assets/pages/ei.jpg'),
-    'ej': require('@/assets/pages/ej.jpg'),
-    'ek': require('@/assets/pages/ek.jpg'),
-    'el': require('@/assets/pages/el.jpg'),
-    'em': require('@/assets/pages/em.jpg'),
-    'en': require('@/assets/pages/en.jpg'),
-    'eo': require('@/assets/pages/eo.jpg'),
-    'ep': require('@/assets/pages/ep.jpg'),
-    'eq': require('@/assets/pages/eq.jpg'),
-    'er': require('@/assets/pages/er.jpg'),
-    'es': require('@/assets/pages/es.jpg'),
-    'et': require('@/assets/pages/et.jpg'),
-    'eu': require('@/assets/pages/eu.jpg'),
-    'ev': require('@/assets/pages/ev.jpg'),
-    'ew': require('@/assets/pages/ew.jpg'),
-    'ex': require('@/assets/pages/ex.jpg'),
-    'ey': require('@/assets/pages/ey.jpg'),
-    'ez': require('@/assets/pages/ez.jpg'),
-    'fa': require('@/assets/pages/fa.jpg'),
-    'fb': require('@/assets/pages/fb.jpg'),
-    'fc': require('@/assets/pages/fc.jpg'),
-    'fd': require('@/assets/pages/fd.jpg'),
-    'fe': require('@/assets/pages/fe.jpg'),
-    'ff': require('@/assets/pages/ff.jpg'),
-    'fg': require('@/assets/pages/fg.jpg'),
-    'fh': require('@/assets/pages/fh.jpg'),
-    'fi': require('@/assets/pages/fi.jpg'),
-    'fj': require('@/assets/pages/fj.jpg'),
-    'fk': require('@/assets/pages/fk.jpg'),
-    'fl': require('@/assets/pages/fl.jpg'),
-    'fm': require('@/assets/pages/fm.jpg'),
-    'fn': require('@/assets/pages/fn.jpg'),
-    'fo': require('@/assets/pages/fo.jpg'),
-    'fp': require('@/assets/pages/fp.jpg'),
-    'fq': require('@/assets/pages/fq.jpg'),
-    'fr': require('@/assets/pages/fr.jpg'),
-    'fs': require('@/assets/pages/fs.jpg'),
-    'ft': require('@/assets/pages/ft.jpg'),
-    'fu': require('@/assets/pages/fu.jpg'),
-    'fv': require('@/assets/pages/fv.jpg'),
-    'fw': require('@/assets/pages/fw.jpg'),
-    'fx': require('@/assets/pages/fx.jpg'),
-    'fy': require('@/assets/pages/fy.jpg'),
-    'fz': require('@/assets/pages/fz.jpg'),
-    'ga': require('@/assets/pages/ga.jpg'),
-    'gb': require('@/assets/pages/gb.jpg'),
-    'gc': require('@/assets/pages/gc.jpg'),
-    'gd': require('@/assets/pages/gd.jpg'),
-    'ge': require('@/assets/pages/ge.jpg'),
-    'gf': require('@/assets/pages/gf.jpg'),
-    'gg': require('@/assets/pages/gg.jpg'),
-    'gh': require('@/assets/pages/gh.jpg'),
-    'gi': require('@/assets/pages/gi.jpg'),
-    'gj': require('@/assets/pages/gj.jpg'),
-    'gk': require('@/assets/pages/gk.jpg'),
-    'gl': require('@/assets/pages/gl.jpg'),
-    'gm': require('@/assets/pages/gm.jpg'),
-    'gn': require('@/assets/pages/gn.jpg'),
-    'go': require('@/assets/pages/go.jpg'),
-    'gp': require('@/assets/pages/gp.jpg'),
-    'gq': require('@/assets/pages/gq.jpg'),
-    'gr': require('@/assets/pages/gr.jpg'),
-    'gs': require('@/assets/pages/gs.jpg'),
-    'gt': require('@/assets/pages/gt.jpg'),
-    'gu': require('@/assets/pages/gu.jpg'),
-    'gv': require('@/assets/pages/gv.jpg'),
-    'gw': require('@/assets/pages/gw.jpg'),
-    'gx': require('@/assets/pages/gx.jpg'),
-    'gy': require('@/assets/pages/gy.jpg'),
-    'gz': require('@/assets/pages/gz.jpg'),
-    'ha': require('@/assets/pages/ha.jpg'),
-    'hb': require('@/assets/pages/hb.jpg'),
-    'hc': require('@/assets/pages/hc.jpg'),
-    'hd': require('@/assets/pages/hd.jpg'),
-    'he': require('@/assets/pages/he.jpg'),
-    'hf': require('@/assets/pages/hf.jpg'),
-    'hg': require('@/assets/pages/hg.jpg'),
-    'hh': require('@/assets/pages/hh.jpg'),
-    'hi': require('@/assets/pages/hi.jpg'),
-    'hj': require('@/assets/pages/hj.jpg'),
-    'hk': require('@/assets/pages/hk.jpg'),
-    'hl': require('@/assets/pages/hl.jpg'),
-    'hm': require('@/assets/pages/hm.jpg'),
-    'hn': require('@/assets/pages/hn.jpg'),
-    'ho': require('@/assets/pages/ho.jpg'),
-    'hp': require('@/assets/pages/hp.jpg'),
-    'hq': require('@/assets/pages/hq.jpg'),
-    'hr': require('@/assets/pages/hr.jpg'),
-    'hs': require('@/assets/pages/hs.jpg'),
-    'ht': require('@/assets/pages/ht.jpg'),
-    'hu': require('@/assets/pages/hu.jpg'),
-    'hv': require('@/assets/pages/hv.jpg'),
-    'hw': require('@/assets/pages/hw.jpg'),
-    'hx': require('@/assets/pages/hx.jpg'),
-    'hy': require('@/assets/pages/hy.jpg'),
-    'hz': require('@/assets/pages/hz.jpg'),
-    'ia': require('@/assets/pages/ia.jpg'),
-    'ib': require('@/assets/pages/ib.jpg'),
-    'ic': require('@/assets/pages/ic.jpg'),
-    'id': require('@/assets/pages/id.jpg'),
-    'ie': require('@/assets/pages/ie.jpg'),
-    'if': require('@/assets/pages/iff.jpg'),
-    'ig': require('@/assets/pages/ig.jpg'),
-    'ih': require('@/assets/pages/ih.jpg'),
-    'ii': require('@/assets/pages/ii.jpg'),
-    'ij': require('@/assets/pages/ij.jpg'),
-    'ik': require('@/assets/pages/ik.jpg'),
-    'il': require('@/assets/pages/il.jpg'),
-    'im': require('@/assets/pages/im.jpg'),
-    'in': require('@/assets/pages/in.jpg'),
-    'io': require('@/assets/pages/io.jpg'),
-    'ip': require('@/assets/pages/ip.jpg'),
-    'iq': require('@/assets/pages/iq.jpg'),
-    'ir': require('@/assets/pages/ir.jpg'),
-    'is': require('@/assets/pages/is.jpg'),
-    'it': require('@/assets/pages/it.jpg'),
-    'iu': require('@/assets/pages/iu.jpg'),
-    'iv': require('@/assets/pages/iv.jpg'),
-    'iw': require('@/assets/pages/iw.jpg'),
-    'ix': require('@/assets/pages/ix.jpg'),
-    'iy': require('@/assets/pages/iy.jpg'),
-    'iz': require('@/assets/pages/iz.jpg'),
-    'ja': require('@/assets/pages/ja.jpg'),
-    'jb': require('@/assets/pages/jb.jpg'),
-    'jc': require('@/assets/pages/jc.jpg'),
-    'jd': require('@/assets/pages/jd.jpg'),
-    'je': require('@/assets/pages/je.jpg'),
-    'jf': require('@/assets/pages/jf.jpg'),
-    'jg': require('@/assets/pages/jg.jpg'),
-    'jh': require('@/assets/pages/jh.jpg'),
-    'ji': require('@/assets/pages/ji.jpg'),
-    'jj': require('@/assets/pages/jj.jpg'),
-    'jk': require('@/assets/pages/jk.jpg'),
-    'jl': require('@/assets/pages/jl.jpg'),
-    'jm': require('@/assets/pages/jm.jpg'),
-    'jn': require('@/assets/pages/jn.jpg'),
-    'jo': require('@/assets/pages/jo.jpg'),
-    'jp': require('@/assets/pages/jp.jpg'),
-    'jq': require('@/assets/pages/jq.jpg'),
-    'jr': require('@/assets/pages/jr.jpg'),
-    'js': require('@/assets/pages/js.jpg'),
-    'jt': require('@/assets/pages/jt.jpg'),
-    'ju': require('@/assets/pages/ju.jpg'),
-    'jv': require('@/assets/pages/jv.jpg'),
-    'jw': require('@/assets/pages/jw.jpg'),
-    'jx': require('@/assets/pages/jx.jpg'),
-    'jy': require('@/assets/pages/jy.jpg'),
-    'jz': require('@/assets/pages/jz.jpg'),
-    'ka': require('@/assets/pages/ka.jpg'),
-    'kb': require('@/assets/pages/kb.jpg'),
-    'kc': require('@/assets/pages/kc.jpg'),
-    'kd': require('@/assets/pages/kd.jpg'),
-    'ke': require('@/assets/pages/ke.jpg'),
-    'kf': require('@/assets/pages/kf.jpg'),
-    'kg': require('@/assets/pages/kg.jpg'),
-    'kh': require('@/assets/pages/kh.jpg'),
-    'ki': require('@/assets/pages/ki.jpg'),
-    'kj': require('@/assets/pages/kj.jpg'),
-    'kk': require('@/assets/pages/kk.jpg'),
-    'kl': require('@/assets/pages/kl.jpg'),
-    'km': require('@/assets/pages/km.jpg'),
-    'kn': require('@/assets/pages/kn.jpg'),
-    'ko': require('@/assets/pages/ko.jpg'),
-    'kp': require('@/assets/pages/kp.jpg'),
-    'kq': require('@/assets/pages/kq.jpg'),
-    'kr': require('@/assets/pages/kr.jpg'),
-    'ks': require('@/assets/pages/ks.jpg'),
-    'kt': require('@/assets/pages/kt.jpg'),
-    'ku': require('@/assets/pages/ku.jpg'),
-    'kv': require('@/assets/pages/kv.jpg'),
-    'kw': require('@/assets/pages/kw.jpg'),
-    'kx': require('@/assets/pages/kx.jpg'),
-    'ky': require('@/assets/pages/ky.jpg'),
-    'kz': require('@/assets/pages/kz.jpg'),
-    'la': require('@/assets/pages/la.jpg'),
-    'lb': require('@/assets/pages/lb.jpg'),
-    'lc': require('@/assets/pages/lc.jpg'),
-    'ld': require('@/assets/pages/ld.jpg'),
-    'le': require('@/assets/pages/le.jpg'),
-    'lf': require('@/assets/pages/lf.jpg'),
-    'lg': require('@/assets/pages/lg.jpg'),
-    'lh': require('@/assets/pages/lh.jpg'),
-    'li': require('@/assets/pages/li.jpg'),
-    'lj': require('@/assets/pages/lj.jpg'),
-    'lk': require('@/assets/pages/lk.jpg'),
-    'll': require('@/assets/pages/ll.jpg'),
-    'lm': require('@/assets/pages/lm.jpg'),
-    'ln': require('@/assets/pages/ln.jpg'),
-    'lo': require('@/assets/pages/lo.jpg'),
-    'lp': require('@/assets/pages/lp.jpg'),
-    'lq': require('@/assets/pages/lq.jpg'),
-    'lr': require('@/assets/pages/lr.jpg'),
-    'ls': require('@/assets/pages/ls.jpg'),
-    'lt': require('@/assets/pages/lt.jpg'),
-    'lu': require('@/assets/pages/lu.jpg'),
-    'lv': require('@/assets/pages/lv.jpg'),
-    'lw': require('@/assets/pages/lw.jpg'),
-    'lx': require('@/assets/pages/lx.jpg'),
-    'ly': require('@/assets/pages/ly.jpg'),
-    'lz': require('@/assets/pages/lz.jpg'),
-    'ma': require('@/assets/pages/ma.jpg'),
-    'mb': require('@/assets/pages/mb.jpg'),
-    'mc': require('@/assets/pages/mc.jpg'),
-    'md': require('@/assets/pages/md.jpg'),
-    'me': require('@/assets/pages/me.jpg'),
-    'mf': require('@/assets/pages/mf.jpg'),
-    'mg': require('@/assets/pages/mg.jpg'),
-    'mh': require('@/assets/pages/mh.jpg'),
-    'mi': require('@/assets/pages/mi.jpg'),
-    'mj': require('@/assets/pages/mj.jpg'),
-    'mk': require('@/assets/pages/mk.jpg'),
-    'ml': require('@/assets/pages/ml.jpg'),
-    'mm': require('@/assets/pages/mm.jpg'),
-    'mn': require('@/assets/pages/mn.jpg'),
-    'mo': require('@/assets/pages/mo.jpg'),
-    'mp': require('@/assets/pages/mp.jpg'),
-    'mq': require('@/assets/pages/mq.jpg'),
-    'mr': require('@/assets/pages/mr.jpg'),
-    'ms': require('@/assets/pages/ms.jpg'),
-    'mt': require('@/assets/pages/mt.jpg'),
-    'mu': require('@/assets/pages/mu.jpg'),
-    'mv': require('@/assets/pages/mv.jpg'),
-    'mw': require('@/assets/pages/mw.jpg'),
-    'mx': require('@/assets/pages/mx.jpg'),
-    'my': require('@/assets/pages/my.jpg'),
-    'mz': require('@/assets/pages/mz.jpg'),
-    'na': require('@/assets/pages/na.jpg'),
-    'nb': require('@/assets/pages/nb.jpg'),
-    'nc': require('@/assets/pages/nc.jpg'),
-    'nd': require('@/assets/pages/nd.jpg'),
-    'ne': require('@/assets/pages/ne.jpg'),
-    'nf': require('@/assets/pages/nf.jpg'),
-    'ng': require('@/assets/pages/ng.jpg'),
-    'nh': require('@/assets/pages/nh.jpg'),
-    'ni': require('@/assets/pages/ni.jpg'),
-    'nj': require('@/assets/pages/nj.jpg'),
-    'nk': require('@/assets/pages/nk.jpg'),
-    'nl': require('@/assets/pages/nl.jpg'),
-    'nm': require('@/assets/pages/nm.jpg'),
-    'nn': require('@/assets/pages/nn.jpg'),
-    'no': require('@/assets/pages/no.jpg'),
-    'np': require('@/assets/pages/np.jpg'),
-    'nq': require('@/assets/pages/nq.jpg'),
-    'nr': require('@/assets/pages/nr.jpg'),
-    'ns': require('@/assets/pages/ns.jpg'),
-    'nt': require('@/assets/pages/nt.jpg'),
-    'nu': require('@/assets/pages/nu.jpg'),
-    'nv': require('@/assets/pages/nv.jpg'),
-    'nw': require('@/assets/pages/nw.jpg'),
-    'nx': require('@/assets/pages/nx.jpg'),
-    'ny': require('@/assets/pages/ny.jpg'),
-    'nz': require('@/assets/pages/nz.jpg'),
-    'oa': require('@/assets/pages/oa.jpg'),
-    'ob': require('@/assets/pages/ob.jpg'),
-    'oc': require('@/assets/pages/oc.jpg'),
-    'od': require('@/assets/pages/od.jpg'),
-    'oe': require('@/assets/pages/oe.jpg'),
-    'of': require('@/assets/pages/of.jpg'),
-    'og': require('@/assets/pages/og.jpg'),
-    'oh': require('@/assets/pages/oh.jpg'),
-    'oi': require('@/assets/pages/oi.jpg'),
-    'oj': require('@/assets/pages/oj.jpg'),
-    'ok': require('@/assets/pages/ok.jpg'),
-    'ol': require('@/assets/pages/ol.jpg'),
-    'om': require('@/assets/pages/om.jpg'),
-    'on': require('@/assets/pages/on.jpg'),
-    'oo': require('@/assets/pages/oo.jpg'),
-    'op': require('@/assets/pages/op.jpg'),
-    'oq': require('@/assets/pages/oq.jpg'),
-    'or': require('@/assets/pages/or.jpg'),
-    'os': require('@/assets/pages/os.jpg'),
-    'ot': require('@/assets/pages/ot.jpg'),
-    'ou': require('@/assets/pages/ou.jpg'),
-    'ov': require('@/assets/pages/ov.jpg'),
-    'ow': require('@/assets/pages/ow.jpg'),
-    'ox': require('@/assets/pages/ox.jpg'),
-    'oy': require('@/assets/pages/oy.jpg'),
-    'oz': require('@/assets/pages/oz.jpg'),
-    'ozz': require('@/assets/pages/ozz.png'),
-    'pa': require('@/assets/pages/pa.jpg'),
-    'pb': require('@/assets/pages/pb.jpg'),
-    'pc': require('@/assets/pages/pc.jpg'),
-    'pd': require('@/assets/pages/pd.jpg'),
-    'pe': require('@/assets/pages/pe.jpg'),
-    'pf': require('@/assets/pages/pf.jpg'),
-    'pg': require('@/assets/pages/pg.jpg'),
-    'ph': require('@/assets/pages/ph.jpg'),
-    'pi': require('@/assets/pages/pi.jpg'),
-    'pj': require('@/assets/pages/pj.jpg'),
-    'pk': require('@/assets/pages/pk.jpg'),
-    'pl': require('@/assets/pages/pl.jpg'),
-    'pm': require('@/assets/pages/pm.jpg'),
-    'pn': require('@/assets/pages/pn.jpg'),
-    'po': require('@/assets/pages/po.jpg'),
-    'pp': require('@/assets/pages/pp.jpg'),
-    'pq': require('@/assets/pages/pq.jpg'),
-    'pr': require('@/assets/pages/pr.jpg'),
-    'ps': require('@/assets/pages/ps.jpg'),
-    'pt': require('@/assets/pages/pt.jpg'),
-    'pu': require('@/assets/pages/pu.jpg'),
-    'pv': require('@/assets/pages/pv.jpg'),
-    'pw': require('@/assets/pages/pw.jpg'),
-    'px': require('@/assets/pages/px.jpg'),
-    'py': require('@/assets/pages/py.jpg'),
-    'pz': require('@/assets/pages/pz.jpg'),
-    'qa': require('@/assets/pages/qa.jpg'),
-    'qb': require('@/assets/pages/qb.jpg'),
-    'qc': require('@/assets/pages/qc.jpg'),
-    'qd': require('@/assets/pages/qd.jpg'),
-    'qe': require('@/assets/pages/qe.jpg'),
-    'qf': require('@/assets/pages/qf.jpg'),
-    'qg': require('@/assets/pages/qg.jpg'),
-    'qh': require('@/assets/pages/qh.jpg'),
-    'qi': require('@/assets/pages/qi.jpg'),
-    'qj': require('@/assets/pages/qj.jpg'),
-    'qk': require('@/assets/pages/qk.jpg'),
-    'ql': require('@/assets/pages/ql.jpg'),
-    'qm': require('@/assets/pages/qm.jpg'),
-    'qn': require('@/assets/pages/qn.jpg'),
-    'qo': require('@/assets/pages/qo.jpg'),
-    'qp': require('@/assets/pages/qp.jpg'),
-    'qq': require('@/assets/pages/qq.jpg'),
-    'qr': require('@/assets/pages/qr.jpg'),
-    'qs': require('@/assets/pages/qs.jpg'),
-    'qt': require('@/assets/pages/qt.jpg'),
-    'qu': require('@/assets/pages/qu.jpg'),
-    'qv': require('@/assets/pages/qv.jpg'),
-    'qw': require('@/assets/pages/qw.jpg'),
-    'qx': require('@/assets/pages/qx.jpg'),
-    'qy': require('@/assets/pages/qy.jpg'),
-    'qz': require('@/assets/pages/qz.jpg'),
-    'ra': require('@/assets/pages/ra.jpg'),
-    'rb': require('@/assets/pages/rb.jpg'),
-    'rc': require('@/assets/pages/rc.jpg'),
-    'rd': require('@/assets/pages/rd.jpg'),
-    're': require('@/assets/pages/re.jpg'),
-    'rf': require('@/assets/pages/rf.jpg'),
-    'rg': require('@/assets/pages/rg.jpg'),
-    'rh': require('@/assets/pages/rh.jpg'),
-    'ri': require('@/assets/pages/ri.jpg'),
-    'rj': require('@/assets/pages/rj.jpg'),
-    'rk': require('@/assets/pages/rk.jpg'),
-    'rl': require('@/assets/pages/rl.jpg'),
-    'rm': require('@/assets/pages/rm.jpg'),
-    'rn': require('@/assets/pages/rn.jpg'),
-    'ro': require('@/assets/pages/ro.jpg'),
-    'rp': require('@/assets/pages/rp.jpg'),
-    'rq': require('@/assets/pages/rq.jpg'),
-    'rr': require('@/assets/pages/rr.jpg'),
-    'rs': require('@/assets/pages/rs.jpg'),
-    'rt': require('@/assets/pages/rt.jpg'),
-    'ru': require('@/assets/pages/ru.jpg'),
-    'rv': require('@/assets/pages/rv.jpg'),
-    'rw': require('@/assets/pages/rw.jpg'),
-    'rx': require('@/assets/pages/rx.jpg'),
-    'ry': require('@/assets/pages/ry.jpg'),
-    'rz': require('@/assets/pages/rz.jpg'),
-    'sa': require('@/assets/pages/sa.jpg'),
-    'sb': require('@/assets/pages/sb.jpg'),
-    'sc': require('@/assets/pages/sc.jpg'),
-    'sd': require('@/assets/pages/sd.jpg'),
-    'se': require('@/assets/pages/se.jpg'),
-    'sf': require('@/assets/pages/sf.jpg'),
-    'sg': require('@/assets/pages/sg.jpg'),
-    'sh': require('@/assets/pages/sh.jpg'),
-    'si': require('@/assets/pages/si.jpg'),
-    'sj': require('@/assets/pages/sj.jpg'),
-    'sk': require('@/assets/pages/sk.jpg'),
-    'sl': require('@/assets/pages/sl.jpg'),
-    'sm': require('@/assets/pages/sm.jpg'),
-    'sn': require('@/assets/pages/sn.jpg'),
-    'so': require('@/assets/pages/so.jpg'),
-    'sp': require('@/assets/pages/sp.jpg'),
-    'sq': require('@/assets/pages/sq.jpg'),
-    'sr': require('@/assets/pages/sr.jpg'),
-    'ss': require('@/assets/pages/ss.jpg'),
-    'st': require('@/assets/pages/st.jpg'),
-    'su': require('@/assets/pages/su.jpg'),
-    'sv': require('@/assets/pages/sv.jpg'),
-    'sw': require('@/assets/pages/sw.jpg'),
-    'sx': require('@/assets/pages/sx.jpg'),
-    'sy': require('@/assets/pages/sy.jpg'),
-    'sz': require('@/assets/pages/sz.jpg'),
-    'ta': require('@/assets/pages/ta.jpg'),
-    'tb': require('@/assets/pages/tb.jpg'),
-    'tc': require('@/assets/pages/tc.jpg'),
-    'td': require('@/assets/pages/td.jpg'),
-    'te': require('@/assets/pages/te.jpg'),
-    'tf': require('@/assets/pages/tf.jpg'),
-    'tg': require('@/assets/pages/tg.jpg'),
-    'th': require('@/assets/pages/th.jpg'),
-    'ti': require('@/assets/pages/ti.jpg'),
-    'tj': require('@/assets/pages/tj.jpg'),
-    'tk': require('@/assets/pages/tk.jpg'),
-    'tl': require('@/assets/pages/tl.jpg'),
-    'tm': require('@/assets/pages/tm.jpg'),
-    'tn': require('@/assets/pages/tn.jpg'),
-    'to': require('@/assets/pages/to.jpg'),
-    'tp': require('@/assets/pages/tp.jpg'),
-    'tq': require('@/assets/pages/tq.jpg'),
-    'tr': require('@/assets/pages/tr.jpg'),
-    'ts': require('@/assets/pages/ts.jpg'),
-    'tt': require('@/assets/pages/tt.jpg'),
-    'tu': require('@/assets/pages/tu.jpg'),
-    'tv': require('@/assets/pages/tv.jpg'),
-    'tw': require('@/assets/pages/tw.jpg'),
-    'tx': require('@/assets/pages/tx.jpg'),
-    'ty': require('@/assets/pages/ty.jpg'),
-    'tz': require('@/assets/pages/tz.jpg'),
-    'ua': require('@/assets/pages/ua.jpg'),
-    'ub': require('@/assets/pages/ub.jpg'),
-    'uc': require('@/assets/pages/uc.jpg'),
-    'ud': require('@/assets/pages/ud.jpg'),
-    'ue': require('@/assets/pages/ue.jpg'),
-    'uf': require('@/assets/pages/uf.jpg'),
-    'ug': require('@/assets/pages/ug.jpg'),
-    'uh': require('@/assets/pages/uh.jpg'),
-    'ui': require('@/assets/pages/ui.jpg'),
-    'uj': require('@/assets/pages/uj.jpg'),
-    'uk': require('@/assets/pages/uk.jpg'),
-    'ul': require('@/assets/pages/ul.jpg'),
-    'um': require('@/assets/pages/um.jpg'),
-    'un': require('@/assets/pages/un.jpg'),
-    'uo': require('@/assets/pages/uo.jpg'),
-    'up': require('@/assets/pages/up.jpg'),
-    'uq': require('@/assets/pages/uq.jpg'),
-    'ur': require('@/assets/pages/ur.jpg'),
-    'us': require('@/assets/pages/us.jpg'),
-    'ut': require('@/assets/pages/ut.jpg'),
-    'uu': require('@/assets/pages/uu.jpg'),
-    'uv': require('@/assets/pages/uv.jpg'),
-    'uw': require('@/assets/pages/uw.jpg'),
-    'ux': require('@/assets/pages/ux.jpg'),
-    'uy': require('@/assets/pages/uy.jpg'),
-    'uz': require('@/assets/pages/uz.jpg'),
-    'va': require('@/assets/pages/va.jpg'),
-    'vb': require('@/assets/pages/vb.jpg'),
-    'vc': require('@/assets/pages/vc.jpg'),
-    'vd': require('@/assets/pages/vd.jpg'),
-    've': require('@/assets/pages/ve.jpg'),
-    'vf': require('@/assets/pages/vf.jpg'),
-    'vg': require('@/assets/pages/vg.jpg'),
-    'vh': require('@/assets/pages/vh.jpg'),
-    'vi': require('@/assets/pages/vi.jpg'),
-    'vj': require('@/assets/pages/vj.jpg'),
-    'vk': require('@/assets/pages/vk.jpg'),
-    'vl': require('@/assets/pages/vl.jpg'),
-    'vm': require('@/assets/pages/vm.jpg'),
-    'vn': require('@/assets/pages/vn.jpg'),
-    'vo': require('@/assets/pages/vo.jpg'),
-    'vp': require('@/assets/pages/vp.jpg'),
-    'vq': require('@/assets/pages/vq.jpg'),
-    'vr': require('@/assets/pages/vr.jpg'),
-    'vs': require('@/assets/pages/vs.jpg'),
-    'vt': require('@/assets/pages/vt.jpg'),
-    'vu': require('@/assets/pages/vu.jpg'),
-    'vv': require('@/assets/pages/vv.jpg'),
-    'vw': require('@/assets/pages/vw.jpg'),
-    'vx': require('@/assets/pages/vx.jpg'),
-    'vy': require('@/assets/pages/vy.jpg'),
-    'vz': require('@/assets/pages/vz.jpg'),
-    'wa': require('@/assets/pages/wa.jpg'),
-    'wb': require('@/assets/pages/wb.jpg'),
-    'wc': require('@/assets/pages/wc.jpg'),
-    'wd': require('@/assets/pages/wd.jpg'),
-    'we': require('@/assets/pages/we.jpg'),
-    'wf': require('@/assets/pages/wf.jpg'),
-    'wg': require('@/assets/pages/wg.jpg'),
-    'wh': require('@/assets/pages/wh.jpg'),
-    'wi': require('@/assets/pages/wi.jpg'),
-    'wj': require('@/assets/pages/wj.jpg'),
-    'wk': require('@/assets/pages/wk.jpg'),
-    'wl': require('@/assets/pages/wl.jpg'),
-    'wm': require('@/assets/pages/wm.jpg'),
-    'wn': require('@/assets/pages/wn.jpg'),
-    'wo': require('@/assets/pages/wo.jpg'),
-    'wp': require('@/assets/pages/wp.jpg'),
-    'wq': require('@/assets/pages/wq.jpg'),
-    'wr': require('@/assets/pages/wr.jpg'),
-    'ws': require('@/assets/pages/ws.jpg'),
-    'wt': require('@/assets/pages/wt.jpg'),
-    'wu': require('@/assets/pages/wu.jpg'),
-    'wv': require('@/assets/pages/wv.jpg'),
-    'ww': require('@/assets/pages/ww.jpg'),
-    'wx': require('@/assets/pages/wx.jpg'),
-    'wy': require('@/assets/pages/wy.jpg'),
-    'wz': require('@/assets/pages/wz.jpg'),
-    'xa': require('@/assets/pages/xa.jpg'),
-    'xb': require('@/assets/pages/xb.jpg'),
-    'xc': require('@/assets/pages/xc.jpg'),
-    'xd': require('@/assets/pages/xd.jpg'),
-    'xe': require('@/assets/pages/xe.jpg'),
-    'xf': require('@/assets/pages/xf.jpg'),
-    'xg': require('@/assets/pages/xg.jpg'),
-    'xh': require('@/assets/pages/xh.jpg'),
-    'xi': require('@/assets/pages/xi.jpg'),
-    'xj': require('@/assets/pages/xj.jpg'),
-    'xk': require('@/assets/pages/xk.jpg'),
-    'xl': require('@/assets/pages/xl.jpg'),
-  };
-
-  return images[pageName] || null;
 }
 
 // Generate the page list once
 const PAGE_NAMES = generatePageNames();
 const PAGES = PAGE_NAMES.map(name => ({
   name,
-  source: getImageSource(name),
-})).filter(page => page.source !== null); // Filter out any missing images
+}));
 
 // Pages that contain sajdah (prostration) in the Quran
 // Note: Page numbers match the user's system where page 1 is empty, so Quran starts at page 2
@@ -693,8 +60,8 @@ const SAJDAH_PAGES = [
   455, // Sad, 38:24
   481, // Fussilat, 41:38
   529, // an-Najm, 53:62
-  590, // al-Inshiqaq, 84:21
-  598  // al-Alaq, 96:19
+  591, // al-Inshiqaq, 84:21
+  599  // al-Alaq, 96:19
 ];
 // 177 (al-A’raf, 7:206)
 // 252 (ar-Ra’d, 13:15)
@@ -704,6 +71,10 @@ type Bookmark = {
   sura: string;
   page: number;
   row?: number; // Optional row number for highlighter
+  startPage?: number;
+  endPage?: number;
+  startJuz?: number;
+  endJuz?: number;
   date: string;
   time: string;
   color: string;
@@ -835,56 +206,72 @@ const PageItem = React.memo(({
   index,
   isLandscape,
   screenWidth,
+  contentWidth,
   rowHighlighterEnabled,
   currentRow,
-  isDarkMode
+  isDarkMode,
+  useLocalImages,
+  quality
 }: {
   item: typeof PAGES[0],
   index: number,
   isLandscape: boolean,
   screenWidth: number,
+  contentWidth: number,
   rowHighlighterEnabled: boolean,
   currentRow: number,
-  isDarkMode: boolean
+  isDarkMode: boolean,
+  useLocalImages: boolean,
+  quality: string | null
 }) => {
   const scrollViewRef = useRef<ScrollView>(null);
   const [imageHeight, setImageHeight] = useState(0);
   const [containerHeight, setContainerHeight] = useState(0);
+  const { t } = useTranslation();
 
-  // Animation value for current row (0-14)
+  const imageSource = useMemo(() => {
+    if (useLocalImages) {
+      // Use jpg extension as that's what we expect from the zip
+      // Add quality param to bust cache when quality changes
+      return { uri: Paths.document.uri.replace(/\/$/, '') + '/quran_pages/' + item.name + '.jpg?q=' + (quality || 'none') };
+    }
+    return null;
+  }, [useLocalImages, item.name, quality]);
+
+  // Animation value for current row (0-15)
   const rowProgress = useSharedValue(currentRow);
 
-  // Update shared value when currentRow changes
   useEffect(() => {
     rowProgress.value = withTiming(currentRow, { duration: 300 });
   }, [currentRow]);
 
-  // Animated style for the highlight overlay
+  // Use explicit pixels instead of percentages to avoid layout instability on Android
   const highlightStyle = useAnimatedStyle(() => {
+    // If we don't have height yet, hide or default to 0
+    // In portrait, containerHeight IS the image height area effectively
+    const activeHeight = isLandscape ? imageHeight : containerHeight;
+    const activeWidth = isLandscape ? contentWidth : screenWidth;
+
+    if (activeHeight === 0) {
+      return { display: 'none' };
+    }
+
+    const rowHeight = activeHeight / 15;
+
     return {
-      top: `${(rowProgress.value / 15) * 100}%`,
-      height: `${100 / 15}%`
+      display: 'flex',
+      top: rowProgress.value * rowHeight,
+      height: rowHeight,
+      width: activeWidth,
     };
-  });
+  }, [imageHeight, containerHeight, isLandscape, contentWidth, screenWidth]);
 
   // Scroll to center the current row in landscape mode
   useEffect(() => {
     if (isLandscape && rowHighlighterEnabled && scrollViewRef.current && imageHeight > 0 && containerHeight > 0) {
       const rowHeight = imageHeight / 15;
-
-      // Calculate target to center the row
-      // Row center relative to image top
       const rowCenterY = (currentRow * rowHeight) + (rowHeight / 2);
-
-      // We want this rowCenterY to be at containerHeight / 2
-      // So we scroll such that scrollTop + (containerHeight / 2) = rowCenterY
-      // scrollTop = rowCenterY - (containerHeight / 2)
-
       const targetY = rowCenterY - (containerHeight / 2);
-
-      // Clamp the scroll position
-      // Min: 0
-      // Max: ContentHeight - ContainerHeight = imageHeight - containerHeight
       const maxScrollY = Math.max(0, imageHeight - containerHeight);
       const clampedY = Math.max(0, Math.min(maxScrollY, targetY));
 
@@ -894,19 +281,30 @@ const PageItem = React.memo(({
 
   const onImageLayout = (event: any) => {
     const { height } = event.nativeEvent.layout;
-    setImageHeight(height);
+    if (height > 0) setImageHeight(height);
   };
 
   const onContainerLayout = (event: any) => {
     const { height } = event.nativeEvent.layout;
-    setContainerHeight(height);
+    if (height > 0) setContainerHeight(height);
   };
 
+  if (!useLocalImages || !imageSource) {
+    const activeWidth = isLandscape ? contentWidth : screenWidth;
+    return (
+      <View style={[styles.pageContainer, { width: activeWidth, justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ textAlign: 'center', color: isDarkMode ? '#fff' : '#000' }}>
+          {t('downloadRequired') || 'Download Required'}
+        </Text>
+      </View>
+    );
+  }
+
   if (isLandscape) {
-    const horizontalPadding = 60;
+    const horizontalPadding = 0;
     return (
       <View
-        style={[styles.pageContainer, { width: screenWidth, paddingHorizontal: horizontalPadding }]}
+        style={[styles.pageContainer, { width: contentWidth, paddingHorizontal: horizontalPadding }]}
         onLayout={onContainerLayout}
       >
         <ScrollView
@@ -918,7 +316,7 @@ const PageItem = React.memo(({
         >
           <View onLayout={onImageLayout}>
             <InvertedImage
-              source={item.source}
+              source={imageSource}
               style={styles.landscapeImage}
               contentFit="fill"
               cachePolicy="memory-disk"
@@ -937,10 +335,10 @@ const PageItem = React.memo(({
     );
   } else {
     return (
-      <View style={[styles.pageContainer, { width: screenWidth }]}>
-        <View style={{ width: '100%', height: '100%' }}>
+      <View style={[styles.pageContainer, { width: contentWidth }]}>
+        <View style={{ width: '100%', height: '100%' }} onLayout={onContainerLayout}>
           <InvertedImage
-            source={item.source}
+            source={imageSource}
             style={styles.pageImage}
             contentFit="fill"
             cachePolicy="memory-disk"
@@ -954,7 +352,7 @@ const PageItem = React.memo(({
             ]} />
           )}
         </View>
-      </View>
+      </View >
     );
   }
 });
@@ -969,8 +367,11 @@ export default function ReaderScreen() {
   const [currentSurahs, setCurrentSurahs] = useState<string[]>([]);
   const [currentRow, setCurrentRow] = useState(0); // 0-14
   const [rowHighlighterEnabled, setRowHighlighterEnabled] = useState(false);
+  const [useLocalImages, setUseLocalImages] = useState(false);
+  const [quality, setQuality] = useState<string | null>(null);
   const dimensions = Dimensions.get('window');
   const [screenWidth, setScreenWidth] = useState(dimensions.width);
+  const [contentWidth, setContentWidth] = useState(dimensions.width);
   const [isLandscape, setIsLandscape] = useState(dimensions.width > dimensions.height);
   const sessionStartedRef = useRef(false);
   const sessionStartTimeRef = useRef<number | null>(null);
@@ -978,6 +379,13 @@ export default function ReaderScreen() {
   const latestPageRef = useRef<number | null>(null);
   const currentRowRef = useRef(currentRow);
   const currentSurahsRef = useRef(currentSurahs);
+  const [limits, setLimits] = useState<{
+    startPage?: number;
+    endPage?: number;
+    startJuz?: number;
+    endJuz?: number;
+  }>({});
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -999,6 +407,19 @@ export default function ReaderScreen() {
           if (stored !== null) {
             setRowHighlighterEnabled(JSON.parse(stored));
           }
+
+          // Check for downloaded images
+          const isDownloaded = await DownloadService.isDownloaded();
+
+          if (!isDownloaded) {
+
+            setShowDownloadModal(true);
+          }
+
+          setUseLocalImages(isDownloaded);
+          const q = await DownloadService.getQuality();
+          setQuality(q);
+
         } catch (error) {
           console.error('Error loading settings in Reader:', error);
         }
@@ -1105,9 +526,11 @@ export default function ReaderScreen() {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
       // Store the current page before updating width
       const currentPageBeforeResize = currentPage;
-      setScreenWidth(window.width);
-      setIsLandscape(window.width > window.height);
+      const newWidth = window.width;
+      setScreenWidth(newWidth);
+      setIsLandscape(newWidth > window.height);
 
+      // Update screen width for rotation
       // After width changes, scroll back to the current page
       setTimeout(() => {
         if (flatListRef.current && currentPageBeforeResize >= 0) {
@@ -1129,9 +552,15 @@ export default function ReaderScreen() {
 
   // Gesture Handler
   const handleRowChange = (direction: 'up' | 'down') => {
+    const isAtStartPage = limits.startPage ? (currentPage + 1 <= limits.startPage) : false;
+    const isAtEndPage = limits.endPage ? (currentPage + 1 >= limits.endPage) : false;
+    const currentJuz = getJuzNumber(currentPage + 1);
+    const isAtStartJuz = limits.startJuz ? (currentJuz <= limits.startJuz) : false;
+    const isAtEndJuz = limits.endJuz ? (currentJuz >= limits.endJuz) : false;
+
     if (direction === 'down') {
       // Moving highlight DOWN (reading forward)
-      if (currentRow < 14) {
+      if (currentRowRef.current < 14) {
         setCurrentRow(prev => prev + 1);
       } else {
         // Next page
@@ -1144,7 +573,7 @@ export default function ReaderScreen() {
       }
     } else {
       // Moving highlight UP (reading backward)
-      if (currentRow > 0) {
+      if (currentRowRef.current > 0) {
         setCurrentRow(prev => prev - 1);
       } else {
         // Previous page
@@ -1158,7 +587,13 @@ export default function ReaderScreen() {
     }
   };
 
-  const panGesture = Gesture.Pan()
+  // Keep a fresh ref to the handler
+  const handleRowChangeRef = useRef(handleRowChange);
+  useEffect(() => {
+    handleRowChangeRef.current = handleRowChange;
+  }, [handleRowChange]);
+
+  const panGesture = useMemo(() => Gesture.Pan()
     .enabled(rowHighlighterEnabled)
     .runOnJS(true)
     .onEnd((e) => {
@@ -1168,20 +603,13 @@ export default function ReaderScreen() {
       const threshold = 30; // Sensitivity
 
       if (translationY < -threshold) {
-        // Swipe UP -> Move Highlight DOWN (Next Row)
-        // Wait, standard scroll logic: Swipe UP (finger moves up) -> Content moves UP -> View moves DOWN.
-        // But user said: "Each swipe down should select the row below".
-        // Swipe DOWN (finger moves down, translationY > 0) -> Select Row Below (Next Row).
-        // Swipe UP (finger moves up, translationY < 0) -> Select Row Above (Prev Row).
-
-        // Let's stick to user's explicit instruction: "Each swipe down should select the row below"
-        // Swipe Down -> translationY > 0
-        handleRowChange('up'); // Moving highlight UP (visually up, index decreases)
+        // Swipe UP -> Move Highlight UP (index decreases)
+        handleRowChangeRef.current('up');
       } else if (translationY > threshold) {
-        // Swipe DOWN -> Select Row Below (Next Row)
-        handleRowChange('down'); // Moving highlight DOWN (visually down, index increases)
+        // Swipe DOWN -> Move Highlight DOWN (index increases)
+        handleRowChangeRef.current('down');
       }
-    });
+    }), [rowHighlighterEnabled]);
 
   useFocusEffect(
     useCallback(() => {
@@ -1228,7 +656,7 @@ export default function ReaderScreen() {
         // Actually, the best place to restore row is probably where we load the bookmark or last session.
         // But this useEffect runs when 'page' param changes.
 
-        // Let's try to get the row from the bookmark if bookmarkId is present
+        // Let's try to get the row and limits from the bookmark if bookmarkId is present
         const restoreRow = async () => {
           if (bookmarkId) {
             try {
@@ -1236,10 +664,20 @@ export default function ReaderScreen() {
               if (storedBookmarks) {
                 const bookmarks: Bookmark[] = JSON.parse(storedBookmarks);
                 const bookmark = bookmarks.find(b => b.id === bookmarkId);
-                if (bookmark && bookmark.row !== undefined) {
-                  setCurrentRow(bookmark.row);
-                } else {
-                  setCurrentRow(0);
+                if (bookmark) {
+                  if (bookmark.row !== undefined) {
+                    setCurrentRow(bookmark.row);
+                  } else {
+                    setCurrentRow(0);
+                  }
+
+                  // Set limits
+                  setLimits({
+                    startPage: bookmark.startPage,
+                    endPage: bookmark.endPage,
+                    startJuz: bookmark.startJuz,
+                    endJuz: bookmark.endJuz,
+                  });
                 }
               }
             } catch (e) {
@@ -1371,36 +809,43 @@ export default function ReaderScreen() {
         index={index}
         isLandscape={isLandscape}
         screenWidth={screenWidth}
+        contentWidth={contentWidth}
         rowHighlighterEnabled={rowHighlighterEnabled}
         currentRow={currentRow}
         isDarkMode={isDarkMode}
+        useLocalImages={useLocalImages}
+        quality={quality}
       />
     );
-  }, [screenWidth, isLandscape, rowHighlighterEnabled, currentRow, isDarkMode]);
+  }, [screenWidth, contentWidth, isLandscape, rowHighlighterEnabled, currentRow, isDarkMode, useLocalImages]);
 
   return (
-    <View style={[styles.container, { backgroundColor: isDarkMode ? theme.background : '#fdf9de' }]}>
-      <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={isDarkMode ? theme.background : '#fdf9de'} />
+    <View style={[styles.container, { backgroundColor: isDarkMode ? theme.background : '#fefce5' }]}>
+      <StatusBar
+        barStyle={isDarkMode ? "light-content" : "dark-content"}
+        backgroundColor={isDarkMode ? theme.background : 'transparent'}
+        translucent={true}
+      />
 
       {/* Always visible top toolbar */}
-      <SafeAreaView style={[styles.topControls, { backgroundColor: isDarkMode ? theme.background : '#fdf9de' }]} edges={['top']}>
+      <SafeAreaView style={[styles.topControls, { backgroundColor: isDarkMode ? theme.background : '#fefce5' }]} edges={['top', 'left', 'right']}>
         {/* Left: Home Button */}
         <TouchableOpacity onPress={() => router.back()} style={styles.homeButton}>
-          <Ionicons name="home" size={24} color={theme.text} />
+          <Ionicons name="home" size={24} color={'#43a746'} />
         </TouchableOpacity>
 
         {/* Center: Page Indicator with Navigation Arrows */}
         <View style={[styles.centerContainer, { paddingTop: insets.top + 8 }]}>
           {/* Left Navigation Arrow (Next Page in RTL/Reading Flow) */}
-          <TouchableOpacity 
-            onPress={goToNextPage} 
-            style={styles.centerNavButton} 
+          <TouchableOpacity
+            onPress={goToNextPage}
+            style={styles.centerNavButton}
             disabled={currentPage === PAGES.length - 1}
           >
-            <Ionicons 
-              name="chevron-back" 
-              size={32} 
-              color={currentPage === PAGES.length - 1 ? theme.border : theme.text} 
+            <Ionicons
+              name="chevron-back"
+              size={32}
+              color={'#43a746'}
             />
           </TouchableOpacity>
 
@@ -1415,65 +860,114 @@ export default function ReaderScreen() {
               <Text style={[styles.pageIndicator, { color: theme.secondaryText }]}>
                 {t('page')}: {currentPage + 1}
               </Text>
-
+              <View style={{ width: 1, height: 12, backgroundColor: theme.border, marginHorizontal: 4 }} />
+              <Text style={[styles.pageIndicator, { color: theme.secondaryText }]}>
+                {t('juz')}: {getJuzNumber(currentPage + 1)}
+              </Text>
             </View>
+            {(limits.startPage || limits.startJuz) && (() => {
+              const currentJuz = getJuzNumber(currentPage + 1);
+              const isWithinPage = limits.startPage ? (currentPage + 1 >= limits.startPage && currentPage + 1 <= limits.endPage!) : true;
+              const isWithinJuz = limits.startJuz ? (currentJuz >= limits.startJuz && currentJuz <= limits.endJuz!) : true;
+
+              const isWithin = isWithinPage && isWithinJuz;
+              const statusColor = isWithin ? theme.primary : '#FF5252';
+              const label = limits.startPage
+                ? `${t('page')} ${limits.startPage}-${limits.endPage}`
+                : `${t('juz')} ${limits.startJuz}-${limits.endJuz}`;
+
+              return (
+                <View style={{ marginTop: 2, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 11, color: statusColor, fontWeight: '700' }}>
+                    {t('target')}: {label}
+                  </Text>
+                </View>
+              );
+            })()}
           </View>
 
           {/* Right Navigation Arrow (Previous Page in RTL/Reading Flow) */}
-          <TouchableOpacity 
-            onPress={goToPreviousPage} 
-            style={styles.centerNavButton} 
+          <TouchableOpacity
+            onPress={goToPreviousPage}
+            style={styles.centerNavButton}
             disabled={currentPage === 0}
           >
-            <Ionicons 
-              name="chevron-forward" 
-              size={32} 
-              color={currentPage === 0 ? theme.border : theme.text} 
+            <Ionicons
+              name="chevron-forward"
+              size={32}
+              color={'#43a746'}
             />
           </TouchableOpacity>
         </View>
         {SAJDAH_PAGES.includes(currentPage + 1) && (
-                <View style={styles.sajdahBadge}>
-                  <Ionicons name="star" size={14} color="#ffae00" />
-                  <Text style={styles.sajdahText}>{t('sajdah')}</Text>
-                </View>
-              )}
+          <View style={styles.sajdahBadge}>
+            <Image
+              source={require('@/assets/images/secde.png')}
+              style={styles.sajdahIcon}
+              contentFit="contain"
+            />
+          </View>
+        )}
       </SafeAreaView>
 
       <SafeAreaView
-        style={[styles.contentContainer, { backgroundColor: isDarkMode ? theme.background : '#fdf9de' }]}
-        edges={['bottom']}
+        style={[styles.contentContainer, { backgroundColor: isDarkMode ? theme.background : '#fefce5' }]}
+        edges={['bottom', 'left', 'right']}
       >
-        <GestureDetector gesture={panGesture}>
-          <FlatList
-            key={`flatlist-${screenWidth}`}
-            ref={flatListRef}
-            data={PAGES}
-            renderItem={renderPage}
-            horizontal
-            inverted
-            pagingEnabled={!rowHighlighterEnabled} // Disable paging snap if highlighter is on? Or just disable scroll?
-            scrollEnabled={!rowHighlighterEnabled} // Disable scroll if highlighter is on
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(item) => item.name}
-            onViewableItemsChanged={onViewableItemsChanged}
-            viewabilityConfig={viewabilityConfig}
-            getItemLayout={(data, index) => ({
-              length: screenWidth,
-              offset: screenWidth * index,
-              index,
-            })}
-            initialScrollIndex={page ? Math.max(0, parseInt(page as string, 10) - 1) : 0}
-            maxToRenderPerBatch={3}
-            windowSize={5}
-            removeClippedSubviews={true}
-            initialNumToRender={2}
-            snapToInterval={screenWidth}
-            snapToAlignment="start"
-            decelerationRate="fast"
-          />
-        </GestureDetector>
+        <View
+          style={{ flex: 1, width: '100%' }}
+          onLayout={(e) => {
+            const width = e.nativeEvent.layout.width;
+            if (width > 0 && width !== contentWidth) {
+              setContentWidth(width);
+            }
+          }}
+        >
+          <GestureDetector gesture={panGesture}>
+            <FlatList
+              key={`flatlist-${contentWidth}`}
+              ref={flatListRef}
+              data={PAGES}
+              extraData={{ currentRow, rowHighlighterEnabled, isLandscape, contentWidth }}
+              renderItem={renderPage}
+              horizontal
+              inverted
+              pagingEnabled={!rowHighlighterEnabled}
+              scrollEnabled={!rowHighlighterEnabled}
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item) => item.name}
+              onViewableItemsChanged={onViewableItemsChanged}
+              viewabilityConfig={viewabilityConfig}
+              getItemLayout={(data, index) => ({
+                length: contentWidth,
+                offset: contentWidth * index,
+                index,
+              })}
+              initialScrollIndex={page ? Math.max(0, parseInt(page as string, 10) - 1) : 0}
+              maxToRenderPerBatch={3}
+              windowSize={5}
+              removeClippedSubviews={Platform.OS === 'android'}
+              initialNumToRender={2}
+              snapToInterval={contentWidth}
+              snapToAlignment="start"
+              decelerationRate="fast"
+              disableIntervalMomentum={true}
+            />
+          </GestureDetector>
+        </View>
       </SafeAreaView>
+
+      <DownloadModal
+        visible={showDownloadModal}
+        onSuccess={async () => {
+          setShowDownloadModal(false);
+          const isDownloaded = await DownloadService.isDownloaded();
+          setUseLocalImages(isDownloaded);
+          const q = await DownloadService.getQuality();
+          setQuality(q);
+        }}
+        onCancel={() => setShowDownloadModal(false)}
+      />
     </View>
   );
 }
@@ -1481,7 +975,7 @@ export default function ReaderScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fdf9de',
+    backgroundColor: '#fefce5',
   },
   topControls: {
     flexDirection: 'row',
@@ -1490,7 +984,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 8,
     paddingBottom: 12,
-    backgroundColor: '#fdf9de',
+    backgroundColor: '#fefce5',
   },
   navButtonTop: {
     paddingHorizontal: 8,
@@ -1539,25 +1033,24 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   sajdahBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 215, 0, 0.2)',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sajdahIcon: {
+    width: 48,
+    height: 48,
   },
   sajdahText: {
     color: '#ffa200',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
   },
   contentContainer: {
     flex: 1,
-    backgroundColor: '#fdf9de',
+    backgroundColor: '#fefce5',
   },
   pageContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },

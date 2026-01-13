@@ -1,17 +1,20 @@
 import { useTheme } from '@/app/context/ThemeContext';
+import { DownloadService } from '@/services/DownloadService';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Alert,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
   Switch,
   Text,
   TouchableOpacity,
-  View,
+  View
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -22,6 +25,10 @@ export default function SettingsScreen() {
   const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const [rowHighlighterEnabled, setRowHighlighterEnabled] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'completed'>('idle');
+  const [quality, setQuality] = useState<'low' | 'mid' | 'high' | null>(null);
+  const [statusMessage, setStatusMessage] = useState('');
 
   useEffect(() => {
     loadSettings();
@@ -33,11 +40,54 @@ export default function SettingsScreen() {
       if (stored !== null) {
         setRowHighlighterEnabled(JSON.parse(stored));
       } else {
-        // Default to false
         setRowHighlighterEnabled(false);
+      }
+
+      const isDownloaded = await DownloadService.isDownloaded();
+      if (isDownloaded) {
+        setDownloadStatus('completed');
+        const q = await DownloadService.getQuality();
+        setQuality(q as 'low' | 'mid' | 'high');
       }
     } catch (error) {
       console.error('Error loading settings:', error);
+    }
+  };
+
+  const handleDownload = async (selectedQuality: 'low' | 'mid' | 'high') => {
+    try {
+      if (downloadStatus === 'downloading') return;
+
+      const size = DownloadService.getDownloadSize(selectedQuality);
+      Alert.alert(
+        t('confirmDownload'),
+        t('confirmDownloadDesc', { size }),
+        [
+          { text: t('cancel'), style: 'cancel' },
+          {
+            text: t('download'),
+            onPress: async () => {
+              setQuality(selectedQuality);
+              setDownloadStatus('downloading');
+              setDownloadProgress(0);
+              setStatusMessage('starting');
+
+              await DownloadService.downloadAndUnzip(selectedQuality, (progress, message) => {
+                setDownloadProgress(progress);
+                setStatusMessage(message);
+              });
+
+              setDownloadStatus('completed');
+              setStatusMessage('downloadSuccess');
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error(error);
+      setDownloadStatus('idle');
+      setStatusMessage(t('downloadError') || 'Download failed');
+      Alert.alert(t('error'), t('downloadErrorDesc') || 'Failed to download pages. Please check internet connection.');
     }
   };
 
@@ -60,7 +110,10 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top', 'bottom']}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.background }]}
+      edges={Platform.OS === 'android' ? ['top', 'bottom', 'left', 'right'] : ['top', 'bottom']}
+    >
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
 
       {/* Header */}
@@ -72,7 +125,7 @@ export default function SettingsScreen() {
         <View style={styles.headerPlaceholder} />
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.content}
         contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
       >
@@ -103,6 +156,82 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             ))}
           </View>
+        </View>
+
+
+        {/* Quran Quality Settings */}
+        <View style={[styles.settingItem, { backgroundColor: theme.card, flexDirection: 'column', alignItems: 'flex-start' }]}>
+          <Text style={[styles.settingLabel, { color: theme.text, marginBottom: 12 }]}>{t('quranPageQuality') || 'Quran Page Quality'}</Text>
+
+          <View style={{ width: '100%', gap: 8, marginBottom: 12 }}>
+            <TouchableOpacity
+              style={[styles.qualityButton, {
+                backgroundColor: quality === 'low' ? theme.primary : theme.background,
+                borderColor: theme.border,
+                borderWidth: 1,
+                paddingVertical: 14 // Increased padding for vertical layout
+              }]}
+              onPress={() => statusMessage !== 'downloading' && handleDownload('low')}
+              disabled={downloadStatus === 'downloading'}
+            >
+              <Text style={[styles.qualityButtonText, { color: quality === 'low' ? '#FFF' : theme.text }]}>
+                {t('low') || 'Low'} ({DownloadService.getDownloadSize('low')})
+              </Text>
+              {quality === 'low' && downloadStatus === 'completed' && (
+                <Ionicons name="checkmark-circle" size={16} color="#FFF" style={{ marginLeft: 4 }} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.qualityButton, {
+                backgroundColor: quality === 'mid' ? theme.primary : theme.background,
+                borderColor: theme.border,
+                borderWidth: 1,
+                paddingVertical: 14
+              }]}
+              onPress={() => statusMessage !== 'downloading' && handleDownload('mid')}
+              disabled={downloadStatus === 'downloading'}
+            >
+              <Text style={[styles.qualityButtonText, { color: quality === 'mid' ? '#FFF' : theme.text }]}>
+                {t('mid') || 'Mid'} ({DownloadService.getDownloadSize('mid')})
+              </Text>
+              {quality === 'mid' && downloadStatus === 'completed' && (
+                <Ionicons name="checkmark-circle" size={16} color="#FFF" style={{ marginLeft: 4 }} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.qualityButton, {
+                backgroundColor: quality === 'high' ? theme.primary : theme.background,
+                borderColor: theme.border,
+                borderWidth: 1,
+                paddingVertical: 14
+              }]}
+              onPress={() => statusMessage !== 'downloading' && handleDownload('high')}
+              disabled={downloadStatus === 'downloading'}
+            >
+              <Text style={[styles.qualityButtonText, { color: quality === 'high' ? '#FFF' : theme.text }]}>
+                {t('high') || 'High'} ({DownloadService.getDownloadSize('high')})
+              </Text>
+              {quality === 'high' && downloadStatus === 'completed' && (
+                <Ionicons name="checkmark-circle" size={16} color="#FFF" style={{ marginLeft: 4 }} />
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {downloadStatus === 'downloading' && (
+            <View style={{ width: '100%', marginTop: 8 }}>
+              <Text style={{ color: theme.secondaryText, marginBottom: 4, fontSize: 12 }}>{t(statusMessage)} ({Math.round(downloadProgress * 100)}%)</Text>
+              <View style={{ height: 4, backgroundColor: theme.border, borderRadius: 2, overflow: 'hidden' }}>
+                <View style={{ width: `${downloadProgress * 100}%`, height: '100%', backgroundColor: theme.primary }} />
+              </View>
+            </View>
+          )}
+          {downloadStatus === 'completed' && statusMessage !== 'starting' && (
+            <Text style={{ color: theme.primary, fontSize: 12, marginTop: 4 }}>
+              <Ionicons name="checkmark" /> {t('downloadSuccess') || 'Downloaded'}
+            </Text>
+          )}
         </View>
 
         {/* Row Highlighter Setting */}
@@ -141,7 +270,7 @@ export default function SettingsScreen() {
 
 
       </ScrollView>
-    </SafeAreaView>
+    </SafeAreaView >
   );
 }
 
@@ -201,4 +330,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  qualityButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  qualityButtonText: {
+    fontWeight: '600',
+  }
 });

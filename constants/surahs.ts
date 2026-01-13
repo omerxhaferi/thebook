@@ -158,4 +158,10 @@ export function getSurahsOnPage(pageNumber: number): Surah[] {
 
   return surahsOnPage;
 }
-
+// Helper function to get the Juz number based on page number
+// Page 2 is the start of Juz 1, each Juz is 20 pages
+export function getJuzNumber(pageNumber: number): number {
+  if (pageNumber < 2) return 1;
+  const juz = Math.floor((pageNumber - 2) / 20) + 1;
+  return Math.min(juz, 30);
+}
