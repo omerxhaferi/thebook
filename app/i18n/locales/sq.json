@@ -1,4 +1,6 @@
 {
+    "listSurahs": "Lista e Sureve",
+    "listJuz": "Lista e Xhuzeve",
     "page": "Faqe",
     "back": "Mbrapa",
     "settings": "Cilësimet",
@@ -89,5 +91,8 @@
     "completedTarget": "Synimi u përfundua",
     "nextTarget": "Shko te synimi",
     "default": "Standard",
-    "type": "Lloji"
+    "type": "Lloji",
+    "juzTitle": "Xhuz",
+    "startsAtPage": "Fillon në faqen",
+    "edit": "Edito"
 }

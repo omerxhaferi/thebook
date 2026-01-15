@@ -1,10 +1,13 @@
 import { useTheme } from '@/app/context/ThemeContext';
+import DownloadModal from '@/components/DownloadModal';
 import { getSurahsOnPage, SURAHS } from '@/constants/surahs';
+import { Bookmark, BookmarkService, LastRead } from '@/services/BookmarkService';
+import { DownloadService } from '@/services/DownloadService';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
@@ -23,91 +26,90 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-interface Bookmark {
-  id: string;
-  name: string;
-  sura: string;
-  page: number;
-  date: string;
-  time: string;
-  timestamp?: number;
-  color: string;
-  startPage?: number;
-  endPage?: number;
-  startJuz?: number;
-  endJuz?: number;
-}
+// Bookmark interface moved to BookmarkService
 
 export default function HomeScreen() {
   const { theme, isDarkMode } = useTheme();
   const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
+  const swipeableRefs = useRef<{ [key: string]: Swipeable | null }>({});
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [name, setName] = useState('');
   const [pageNumber, setPageNumber] = useState('');
-  const [lastRead, setLastRead] = useState<{
-    sura: string;
-    page: number;
-    date: string;
-    time: string;
-    timestamp?: number;
-    duration: string;
-    durationMinutes?: number;
-    pages: number;
-  } | null>(null);
+  const [lastRead, setLastRead] = useState<LastRead | null>(null);
   const [startPage, setStartPage] = useState('');
   const [endPage, setEndPage] = useState('');
   const [startJuz, setStartJuz] = useState('');
   const [endJuz, setEndJuz] = useState('');
   const [bookmarkMode, setBookmarkMode] = useState<'default' | 'target'>('default');
   const [targetType, setTargetType] = useState<'page' | 'juz'>('page');
+  const [editingBookmarkId, setEditingBookmarkId] = useState<string | null>(null);
+  const [menuModalVisible, setMenuModalVisible] = useState(false);
+  const [showDownloadModal, setShowDownloadModal] = useState(false);
 
   useEffect(() => {
-    loadBookmarks();
-    loadLastRead();
+    // Initial load and subscription
+    const updateData = async () => {
+      const [b, lr] = await Promise.all([
+        BookmarkService.getBookmarks(),
+        BookmarkService.getLastRead(),
+      ]);
+      setBookmarks(b);
+      setLastRead(lr);
+    };
+
+    updateData();
+    const unsubscribe = BookmarkService.subscribe(updateData);
+
+    // Migration logic: Force reset of pages for this version
+    const checkMigration = async () => {
+      const MIGRATION_KEY = 'v2_force_redownload_all_pages';
+      const hasMigrated = await AsyncStorage.getItem(MIGRATION_KEY);
+
+      if (!hasMigrated) {
+        console.log('Forcing page reset for first launch...');
+        try {
+          // 1. Clear everything
+          await DownloadService.clearPagesDirectory();
+
+          // 2. Mark as migrated so this only happens once
+          await AsyncStorage.setItem(MIGRATION_KEY, 'true');
+
+          // 3. Show the download modal immediately
+          setShowDownloadModal(true);
+        } catch (error) {
+          console.error('Migration failed:', error);
+        }
+      } else {
+        // Also check if they ever finished the download. If not, show modal.
+        const isDownloaded = await DownloadService.isDownloaded();
+        if (!isDownloaded) {
+          setShowDownloadModal(true);
+        }
+      }
+    };
+    checkMigration();
+
+    return () => { unsubscribe(); };
   }, []);
 
   useFocusEffect(
-    React.useCallback(() => {
-      loadBookmarks();
-      loadLastRead();
+    useCallback(() => {
+      // We do NOT want to refresh from disk here because it might be stale.
+      // The service state is already up to date from the Reader screen.
+      // If anything, we can force a re-render with current service data.
+      const syncData = async () => {
+        const [b, lr] = await Promise.all([
+          BookmarkService.getBookmarks(),
+          BookmarkService.getLastRead(),
+        ]);
+        setBookmarks(b);
+        setLastRead(lr);
+      };
+      syncData();
     }, [])
   );
-
-  const loadBookmarks = async () => {
-    try {
-      const stored = await AsyncStorage.getItem('bookmarks');
-      if (stored) {
-        setBookmarks(JSON.parse(stored));
-      }
-    } catch (error) {
-      console.error('Error loading bookmarks:', error);
-    }
-  };
-
-  const loadLastRead = async () => {
-    try {
-      const stored = await AsyncStorage.getItem('lastRead');
-      if (stored) {
-        setLastRead(JSON.parse(stored));
-      } else {
-        // Set default last read (Al-Fatihah, page 2)
-        const surahs = getSurahsOnPage(2);
-        const surahName = surahs.length > 0 ? surahs[0].englishName : 'Al-Fatihah';
-        setLastRead({
-          sura: surahName,
-          page: 2,
-          date: '',
-          time: '',
-          duration: '',
-          pages: 0,
-        });
-      }
-    } catch (error) {
-      console.error('Error loading last read:', error);
-    }
-  };
 
   const generateRandomColor = () => {
     return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
@@ -143,6 +145,31 @@ export default function HomeScreen() {
     if (i18n.language === 'sq') return surah.albanianName || englishName;
     if (i18n.language === 'tr') return surah.turkishName || englishName;
     return surah.englishName;
+  };
+
+  const handleEditBookmark = (bookmark: Bookmark) => {
+    // Close the swipeable row
+    swipeableRefs.current[bookmark.id]?.close();
+
+    setEditingBookmarkId(bookmark.id);
+    setName(bookmark.name);
+    setBookmarkMode(bookmark.startPage || bookmark.startJuz ? 'target' : 'default');
+
+    if (bookmark.startPage || bookmark.startJuz) {
+      if (bookmark.startPage) {
+        setTargetType('page');
+        setStartPage(bookmark.startPage.toString());
+        setEndPage(bookmark.endPage?.toString() || '');
+      } else if (bookmark.startJuz) {
+        setTargetType('juz');
+        setStartJuz(bookmark.startJuz.toString());
+        setEndJuz(bookmark.endJuz?.toString() || '');
+      }
+    } else {
+      setPageNumber(bookmark.page.toString());
+    }
+
+    setModalVisible(true);
   };
 
   const handleSave = async () => {
@@ -183,24 +210,38 @@ export default function HomeScreen() {
       const surahs = getSurahsOnPage(effectivePage);
       const surahName = surahs.length > 0 ? surahs[0].englishName : 'Unknown';
 
-      const newBookmark: Bookmark = {
-        id: Date.now().toString(),
-        name: name.trim(),
-        sura: surahName,
-        page: effectivePage,
-        date: formatDate(),
-        time: formatTime(),
-        timestamp: Date.now(),
-        color: generateRandomColor(),
-        startPage: isTargetMode && targetType === 'page' ? Number(startPage) : undefined,
-        endPage: isTargetMode && targetType === 'page' ? Number(endPage) : undefined,
-        startJuz: isTargetMode && targetType === 'juz' ? Number(startJuz) : undefined,
-        endJuz: isTargetMode && targetType === 'juz' ? Number(endJuz) : undefined,
-      };
-
-      const updatedBookmarks = [...bookmarks, newBookmark];
-      setBookmarks(updatedBookmarks);
-      await AsyncStorage.setItem('bookmarks', JSON.stringify(updatedBookmarks));
+      if (editingBookmarkId) {
+        const existingBookmark = bookmarks.find(b => b.id === editingBookmarkId);
+        if (existingBookmark) {
+          const updatedBookmark: Bookmark = {
+            ...existingBookmark,
+            name: name.trim(),
+            sura: surahName,
+            page: effectivePage,
+            startPage: isTargetMode && targetType === 'page' ? Number(startPage) : undefined,
+            endPage: isTargetMode && targetType === 'page' ? Number(endPage) : undefined,
+            startJuz: isTargetMode && targetType === 'juz' ? Number(startJuz) : undefined,
+            endJuz: isTargetMode && targetType === 'juz' ? Number(endJuz) : undefined,
+          };
+          await BookmarkService.updateBookmark(updatedBookmark);
+        }
+      } else {
+        const newBookmark: Bookmark = {
+          id: Date.now().toString(),
+          name: name.trim(),
+          sura: surahName,
+          page: effectivePage,
+          date: formatDate(),
+          time: formatTime(),
+          timestamp: Date.now(),
+          color: generateRandomColor(),
+          startPage: isTargetMode && targetType === 'page' ? Number(startPage) : undefined,
+          endPage: isTargetMode && targetType === 'page' ? Number(endPage) : undefined,
+          startJuz: isTargetMode && targetType === 'juz' ? Number(startJuz) : undefined,
+          endJuz: isTargetMode && targetType === 'juz' ? Number(endJuz) : undefined,
+        };
+        await BookmarkService.addBookmark(newBookmark);
+      }
 
       // Reset form and close modal
       setName('');
@@ -209,6 +250,7 @@ export default function HomeScreen() {
       setEndPage('');
       setStartJuz('');
       setEndJuz('');
+      setEditingBookmarkId(null);
       setModalVisible(false);
     } catch (error) {
       console.error('Error saving bookmark:', error);
@@ -225,6 +267,7 @@ export default function HomeScreen() {
     setEndJuz('');
     setBookmarkMode('default');
     setTargetType('page');
+    setEditingBookmarkId(null);
     setModalVisible(false);
   };
 
@@ -242,9 +285,7 @@ export default function HomeScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const updatedBookmarks = bookmarks.filter(b => b.id !== bookmarkId);
-              setBookmarks(updatedBookmarks);
-              await AsyncStorage.setItem('bookmarks', JSON.stringify(updatedBookmarks));
+              await BookmarkService.deleteBookmark(bookmarkId);
             } catch (error) {
               console.error('Error deleting bookmark:', error);
               Alert.alert(t('error'), t('deleteError'));
@@ -257,13 +298,22 @@ export default function HomeScreen() {
 
   const renderRightActions = (bookmark: Bookmark) => {
     return (
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => handleDeleteBookmark(bookmark.id, bookmark.name)}
-      >
-        <Ionicons name="trash" size={24} color="white" />
-        <Text style={styles.deleteButtonText}>{t('delete')}</Text>
-      </TouchableOpacity>
+      <View style={{ flexDirection: 'row' }}>
+        <TouchableOpacity
+          style={[styles.editButton, { backgroundColor: theme.primary }]}
+          onPress={() => handleEditBookmark(bookmark)}
+        >
+          <Ionicons name="pencil" size={24} color="white" />
+          <Text style={styles.deleteButtonText}>{t('edit')}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleDeleteBookmark(bookmark.id, bookmark.name)}
+        >
+          <Ionicons name="trash" size={24} color="white" />
+          <Text style={styles.deleteButtonText}>{t('delete')}</Text>
+        </TouchableOpacity>
+      </View>
     );
   };
 
@@ -282,8 +332,8 @@ export default function HomeScreen() {
             paddingRight: Math.max(20, insets.right)
           }
         ]}>
-          <TouchableOpacity onPress={() => router.push('/surahs')}>
-            <Ionicons name="list" size={28} color={theme.primary} />
+          <TouchableOpacity onPress={() => setMenuModalVisible(true)}>
+            <Ionicons name="menu" size={32} color={theme.primary} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => router.push('/settings')}>
             <Ionicons name="settings" size={28} color={theme.primary} />
@@ -356,19 +406,14 @@ export default function HomeScreen() {
             {bookmarks.map((bookmark, index) => (
               <Swipeable
                 key={bookmark.id}
+                ref={(ref) => { swipeableRefs.current[bookmark.id] = ref; }}
                 renderRightActions={() => renderRightActions(bookmark)}
                 overshootRight={false}
               >
                 <TouchableOpacity
                   style={[styles.bookmarkCard, { backgroundColor: theme.card }]}
                   onPress={() => {
-                    let targetPage = bookmark.page;
-                    if (bookmark.startPage) {
-                      targetPage = bookmark.startPage;
-                    } else if (bookmark.startJuz) {
-                      targetPage = (bookmark.startJuz - 1) * 20 + 2;
-                    }
-                    router.push(`/reader?page=${targetPage}&bookmarkId=${bookmark.id}`);
+                    router.push(`/reader?page=${bookmark.page}&bookmarkId=${bookmark.id}`);
                   }}
                   activeOpacity={0.7}
                 >
@@ -425,6 +470,44 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </SafeAreaView>
 
+      {/* Menu Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={menuModalVisible}
+        onRequestClose={() => setMenuModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setMenuModalVisible(false)}
+        >
+          <View style={[styles.menuContent, { backgroundColor: theme.card }]}>
+            <TouchableOpacity
+              style={[styles.menuItem, { borderBottomWidth: 1, borderBottomColor: theme.border }]}
+              onPress={() => {
+                setMenuModalVisible(false);
+                router.push('/surahs');
+              }}
+            >
+              <Ionicons name="list" size={24} color={theme.primary} style={{ marginRight: 15 }} />
+              <Text style={[styles.menuText, { color: theme.text }]}>{t('listSurahs')}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuModalVisible(false);
+                router.push('/juz');
+              }}
+            >
+              <Ionicons name="grid" size={24} color={theme.primary} style={{ marginRight: 15 }} />
+              <Text style={[styles.menuText, { color: theme.text }]}>{t('listJuz')}</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* Add Bookmark Modal Popup */}
       <Modal
         animationType="fade"
@@ -438,20 +521,22 @@ export default function HomeScreen() {
             style={styles.modalContainer}
           >
             <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
-              <View style={[styles.segmentContainer, { marginBottom: 16, backgroundColor: theme.background }]}>
-                <TouchableOpacity
-                  style={[styles.segment, bookmarkMode === 'default' && { backgroundColor: theme.primary }]}
-                  onPress={() => setBookmarkMode('default')}
-                >
-                  <Text style={[styles.segmentText, bookmarkMode === 'default' && { color: '#FFF' }, bookmarkMode !== 'default' && { color: theme.secondaryText }]}>{t('default')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.segment, bookmarkMode === 'target' && { backgroundColor: theme.primary }]}
-                  onPress={() => setBookmarkMode('target')}
-                >
-                  <Text style={[styles.segmentText, bookmarkMode === 'target' && { color: '#FFF' }, bookmarkMode !== 'target' && { color: theme.secondaryText }]}>{t('target')}</Text>
-                </TouchableOpacity>
-              </View>
+              {!editingBookmarkId && (
+                <View style={[styles.segmentContainer, { marginBottom: 16, backgroundColor: theme.background }]}>
+                  <TouchableOpacity
+                    style={[styles.segment, bookmarkMode === 'default' && { backgroundColor: theme.primary }]}
+                    onPress={() => setBookmarkMode('default')}
+                  >
+                    <Text style={[styles.segmentText, bookmarkMode === 'default' && { color: '#FFF' }, bookmarkMode !== 'default' && { color: theme.secondaryText }]}>{t('default')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.segment, bookmarkMode === 'target' && { backgroundColor: theme.primary }]}
+                    onPress={() => setBookmarkMode('target')}
+                  >
+                    <Text style={[styles.segmentText, bookmarkMode === 'target' && { color: '#FFF' }, bookmarkMode !== 'target' && { color: theme.secondaryText }]}>{t('target')}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               <View style={styles.inputContainer}>
                 <Text style={[styles.inputLabel, { color: theme.text }]}>{t('name')}</Text>
@@ -544,6 +629,11 @@ export default function HomeScreen() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      <DownloadModal
+        visible={showDownloadModal}
+        onSuccess={() => setShowDownloadModal(false)}
+      />
     </GestureHandlerRootView>
   );
 }
@@ -795,6 +885,14 @@ const styles = StyleSheet.create({
     width: 100,
     borderRadius: 16,
     marginBottom: 16,
+    marginLeft: 8,
+  },
+  editButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    borderRadius: 16,
+    marginBottom: 16,
   },
   deleteButtonText: {
     color: 'white',
@@ -819,5 +917,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#666',
+  },
+  menuContent: {
+    width: '80%',
+    borderRadius: 20,
+    padding: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 15,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+  },
+  menuText: {
+    fontSize: 18,
+    fontWeight: '600',
   },
 });

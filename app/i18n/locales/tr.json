@@ -1,4 +1,6 @@
 {
+    "listSurahs": "Surelerin Listesi",
+    "listJuz": "Cüzlerin Listesi",
     "page": "Sayfa",
     "back": "Geri",
     "settings": "Ayarlar",
@@ -89,5 +91,8 @@
     "completedTarget": "Hedef Tamamlandı",
     "nextTarget": "Hedefe Git",
     "default": "Basit",
-    "type": "Tür"
+    "type": "Tür",
+    "juzTitle": "Cüz",
+    "startsAtPage": "Sayfada başlıyor",
+    "edit": "Ayarla"
 }

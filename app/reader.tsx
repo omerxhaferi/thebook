@@ -65,20 +65,7 @@ const SAJDAH_PAGES = [
 ];
 // 177 (al-A’raf, 7:206)
 // 252 (ar-Ra’d, 13:15)
-type Bookmark = {
-  id: string;
-  name: string;
-  sura: string;
-  page: number;
-  row?: number; // Optional row number for highlighter
-  startPage?: number;
-  endPage?: number;
-  startJuz?: number;
-  endJuz?: number;
-  date: string;
-  time: string;
-  color: string;
-};
+import { BookmarkService, LastRead } from '@/services/BookmarkService';
 
 
 
@@ -459,7 +446,7 @@ export default function ReaderScreen() {
     const sessionDate = formatDate();
     const sessionTime = formatTime();
 
-    const lastReadPayload = {
+    const lastReadPayload: LastRead = {
       sura: surahName,
       page: latestPageRef.current,
       date: sessionDate,
@@ -472,27 +459,17 @@ export default function ReaderScreen() {
       surahs: currentSurahsRef.current,
     };
     try {
-      await AsyncStorage.setItem('lastRead', JSON.stringify(lastReadPayload));
+      await BookmarkService.updateLastRead(lastReadPayload);
 
       if (bookmarkId && typeof bookmarkId === 'string') {
-        const stored = await AsyncStorage.getItem('bookmarks');
-        if (stored) {
-          const parsed: Bookmark[] = JSON.parse(stored);
-          const updated = parsed.map((bookmark) =>
-            bookmark.id === bookmarkId
-              ? {
-                ...bookmark,
-                page: latestPageRef.current,
-                row: currentRowRef.current, // Use ref
-                sura: surahName, // Keep sura for backward compatibility if needed, or remove if surahs array is preferred
-                date: sessionDate,
-                time: sessionTime,
-                timestamp: Date.now(),
-              }
-              : bookmark
-          );
-          await AsyncStorage.setItem('bookmarks', JSON.stringify(updated));
-        }
+        await BookmarkService.updateBookmarkPage(
+          bookmarkId,
+          latestPageRef.current,
+          currentRowRef.current,
+          surahName,
+          sessionDate,
+          sessionTime
+        );
       }
     } catch (error) {
       console.error('Error saving reading session:', error);
@@ -660,25 +637,22 @@ export default function ReaderScreen() {
         const restoreRow = async () => {
           if (bookmarkId) {
             try {
-              const storedBookmarks = await AsyncStorage.getItem('bookmarks');
-              if (storedBookmarks) {
-                const bookmarks: Bookmark[] = JSON.parse(storedBookmarks);
-                const bookmark = bookmarks.find(b => b.id === bookmarkId);
-                if (bookmark) {
-                  if (bookmark.row !== undefined) {
-                    setCurrentRow(bookmark.row);
-                  } else {
-                    setCurrentRow(0);
-                  }
-
-                  // Set limits
-                  setLimits({
-                    startPage: bookmark.startPage,
-                    endPage: bookmark.endPage,
-                    startJuz: bookmark.startJuz,
-                    endJuz: bookmark.endJuz,
-                  });
+              const bookmarks = await BookmarkService.getBookmarks();
+              const bookmark = bookmarks.find(b => b.id === bookmarkId);
+              if (bookmark) {
+                if (bookmark.row !== undefined) {
+                  setCurrentRow(bookmark.row);
+                } else {
+                  setCurrentRow(0);
                 }
+
+                // Set limits
+                setLimits({
+                  startPage: bookmark.startPage,
+                  endPage: bookmark.endPage,
+                  startJuz: bookmark.startJuz,
+                  endJuz: bookmark.endJuz,
+                });
               }
             } catch (e) {
               console.error("Error loading bookmark row", e);
@@ -697,12 +671,11 @@ export default function ReaderScreen() {
             // If we want to restore last session row, we need to read it.
             // Let's do a quick check for lastRead if no bookmarkId
             try {
-              const lastRead = await AsyncStorage.getItem('lastRead');
+              const lastRead = await BookmarkService.getLastRead();
               if (lastRead) {
-                const parsed = JSON.parse(lastRead);
                 // Only restore if the page matches
-                if (parsed.page === parseInt(page as string, 10)) {
-                  setCurrentRow(parsed.row || 0);
+                if (lastRead.page === parseInt(page as string, 10)) {
+                  setCurrentRow(lastRead.row || 0);
                 } else {
                   setCurrentRow(0);
                 }
@@ -734,18 +707,11 @@ export default function ReaderScreen() {
       // Try to load last session if no page param
       const loadLastSession = async () => {
         try {
-          const lastRead = await AsyncStorage.getItem('lastRead');
+          const lastRead = await BookmarkService.getLastRead();
           if (lastRead) {
-            const parsed = JSON.parse(lastRead);
-            if (parsed.page && parsed.page > 0) {
-              // We should probably navigate to this page?
-              // But if we are here, 'page' param was null.
-              // Usually the home screen handles checking lastRead and passing the page param.
-              // If we are here without page param, it means we just opened Reader directly?
-              // Or maybe we should just set the row if we happen to be on the right page?
-              // But default is Page 1.
-              if (parsed.page === 1) {
-                setCurrentRow(parsed.row || 0);
+            if (lastRead.page && lastRead.page > 0) {
+              if (lastRead.page === 1) {
+                setCurrentRow(lastRead.row || 0);
               }
             }
           }
@@ -1010,7 +976,7 @@ const styles = StyleSheet.create({
   },
   centerNavButton: {
     paddingVertical: 8,
-    paddingHorizontal: 28,
+    paddingHorizontal: 2,
   },
   pageIndicatorContainer: {
     alignItems: 'center',

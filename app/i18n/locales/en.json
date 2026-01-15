@@ -1,4 +1,6 @@
 {
+    "listSurahs": "List of Surahs",
+    "listJuz": "Juz List",
     "page": "Page",
     "back": "Back",
     "settings": "Settings",
@@ -89,5 +91,8 @@
     "completedTarget": "Target Completed",
     "nextTarget": "Go to Target",
     "default": "Default",
-    "type": "Type"
+    "type": "Type",
+    "juzTitle": "Juz",
+    "startsAtPage": "Starts at page",
+    "edit": "Edit"
 }
