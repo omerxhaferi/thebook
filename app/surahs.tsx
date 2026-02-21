@@ -76,9 +76,12 @@ export default function SurahsScreen() {
         style={styles.safeArea}
         edges={Platform.OS === 'android' ? ['top', 'bottom', 'left', 'right'] : ['top', 'bottom']}
       >
-        <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={28} color={theme.primary} />
+        <View style={[styles.header, { backgroundColor: theme.background }]}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={[styles.backButton, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}
+          >
+            <Ionicons name="arrow-back" size={22} color={theme.primary} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.text }]}>{t('surahsTitle')}</Text>
           <View style={styles.placeholder} />
@@ -128,13 +131,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    paddingVertical: 14,
   },
   backButton: {
-    padding: 4,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 20,
@@ -142,7 +146,7 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   placeholder: {
-    width: 36,
+    width: 40,
   },
   listContent: {
     padding: 16,
@@ -151,7 +155,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFF',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     shadowColor: '#000',
@@ -161,10 +165,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   surahNumber: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#4CAF50',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#2E7D32',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -193,7 +197,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   surahMetaText: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#999',
   },
   pageInfo: {
@@ -203,7 +207,7 @@ const styles = StyleSheet.create({
   pageNumber: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#2E7D32',
   },
   pageLabel: {
     fontSize: 12,

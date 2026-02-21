@@ -1,4 +1,5 @@
 import { useTheme } from '@/app/context/ThemeContext';
+import { RubElHizbIcon } from '@/components/IslamicIcons';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
@@ -30,8 +31,9 @@ export default function JuzScreen() {
             onPress={() => router.push(`/reader?page=${item.startPage}`)}
             activeOpacity={0.7}
         >
-            <View style={[styles.juzNumber, { backgroundColor: theme.primary }]}>
-                <Text style={styles.juzNumberText}>{item.number}</Text>
+            <View style={styles.juzBadge}>
+                <RubElHizbIcon size={48} color={theme.primary} />
+                <Text style={[styles.juzNumberText, { color: theme.primary }]}>{item.number}</Text>
             </View>
 
             <View style={styles.juzInfo}>
@@ -54,9 +56,12 @@ export default function JuzScreen() {
                 style={styles.safeArea}
                 edges={Platform.OS === 'android' ? ['top', 'bottom', 'left', 'right'] : ['top', 'bottom']}
             >
-                <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={28} color={theme.primary} />
+                <View style={[styles.header, { backgroundColor: theme.background }]}>
+                    <TouchableOpacity
+                        onPress={() => router.back()}
+                        style={[styles.backButton, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}
+                    >
+                        <Ionicons name="arrow-back" size={22} color={theme.primary} />
                     </TouchableOpacity>
                     <Text style={[styles.headerTitle, { color: theme.text }]}>{t('listJuz')}</Text>
                     <View style={styles.placeholder} />
@@ -87,18 +92,21 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
+        paddingVertical: 14,
     },
     backButton: {
-        padding: 4,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     headerTitle: {
         fontSize: 20,
         fontWeight: 'bold',
     },
     placeholder: {
-        width: 36,
+        width: 40,
     },
     listContent: {
         padding: 16,
@@ -106,7 +114,7 @@ const styles = StyleSheet.create({
     juzCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 12,
+        borderRadius: 16,
         padding: 16,
         marginBottom: 12,
         shadowOffset: { width: 0, height: 1 },
@@ -114,18 +122,17 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 2,
     },
-    juzNumber: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+    juzBadge: {
+        width: 48,
+        height: 48,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 16,
     },
     juzNumberText: {
-        fontSize: 18,
+        position: 'absolute',
+        fontSize: 14,
         fontWeight: 'bold',
-        color: '#FFF',
     },
     juzInfo: {
         flex: 1,

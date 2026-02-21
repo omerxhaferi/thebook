@@ -23,8 +23,11 @@ export const detectLanguage = async () => {
             return savedLanguage;
         }
 
-        // 2. Check IP
-        const response = await fetch("https://ipinfo.io/json");
+        // 2. Check IP (with 3s timeout to prevent blocking app startup)
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3000);
+        const response = await fetch("https://ipinfo.io/json", { signal: controller.signal });
+        clearTimeout(timeout);
         const data = await response.json();
         const country = data.country;
 

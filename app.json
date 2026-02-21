@@ -2,14 +2,9 @@
   "expo": {
     "name": "Kuran",
     "slug": "kurani-app",
-    "version": "3.1.2",
+    "version": "3.2.0",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
-    "splash": {
-      "image": "./assets/images/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "scheme": "thebook",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -38,7 +33,7 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.k.kuraniarabisht",
-      "versionCode": 21,
+      "versionCode": 22,
       "permissions": [
         "INTERNET"
       ]

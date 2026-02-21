@@ -1,19 +1,30 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Paths } from 'expo-file-system';
 import * as FileSystem from 'expo-file-system/legacy';
 import { subscribe, unzip } from 'react-native-zip-archive';
 
-const QURAN_PAGES_DIR = Paths.document.uri.replace(/\/$/, '') + '/quran_pages/';
+export type FontType = 'diyanet' | 'husrev';
+
+const QURAN_PAGES_DIR = FileSystem.documentDirectory + 'quran_pages/';
 const ZIP_URLS = {
-    low: 'https://omahapp-deployments.s3.eu-central-1.amazonaws.com/low.zip',
-    mid: 'https://omahapp-deployments.s3.eu-central-1.amazonaws.com/mid.zip',
-    high: 'https://omahapp-deployments.s3.eu-central-1.amazonaws.com/high.zip',
+    diyanet: {
+        low: 'https://omahapp-deployments.s3.eu-central-1.amazonaws.com/low.zip',
+        mid: 'https://omahapp-deployments.s3.eu-central-1.amazonaws.com/mid.zip',
+        high: 'https://omahapp-deployments.s3.eu-central-1.amazonaws.com/high.zip',
+    },
+    husrev: {
+        high: 'https://omahapp-deployments.s3.eu-central-1.amazonaws.com/h_high.zip',
+    },
 };
 
-const DOWNLOAD_SIZES = {
-    low: '150 MB',
-    mid: '300 MB',
-    high: '1 GB'
+const DOWNLOAD_SIZES: Record<string, Record<string, string>> = {
+    diyanet: {
+        low: '150 MB',
+        mid: '300 MB',
+        high: '1 GB',
+    },
+    husrev: {
+        high: '300 MB',
+    },
 };
 
 export const DownloadService = {
@@ -35,6 +46,7 @@ export const DownloadService = {
 
             // Clear preferences
             await AsyncStorage.removeItem('quran_quality_preference');
+            await AsyncStorage.removeItem('quran_font_preference');
             await AsyncStorage.removeItem('quran_images_downloaded');
         } catch (error) {
             console.error('Error clearing pages directory:', error);
@@ -42,17 +54,18 @@ export const DownloadService = {
         }
     },
 
-    async downloadAndUnzip(quality: 'low' | 'mid' | 'high', onProgress: (progress: number, message: string) => void) {
+    async downloadAndUnzip(quality: 'low' | 'mid' | 'high', onProgress: (progress: number, message: string) => void, font: FontType = 'diyanet') {
         try {
-            const url = ZIP_URLS[quality];
+            const fontUrls = ZIP_URLS[font];
+            const url = (fontUrls as Record<string, string>)[quality];
             if (!url) {
-                throw new Error(`No URL for quality: ${quality}`);
+                throw new Error(`No URL for font: ${font}, quality: ${quality}`);
             }
 
             // Clear existing pages first
             await this.clearPagesDirectory();
 
-            const zipUri = Paths.cache.uri + '/quran_pages.zip';
+            const zipUri = FileSystem.cacheDirectory + 'quran_pages.zip';
 
             // 1. Download
             onProgress(0, 'downloading');
@@ -116,6 +129,7 @@ export const DownloadService = {
             // 4. Cleanup and Save Preference
             await FileSystem.deleteAsync(zipUri);
             await AsyncStorage.setItem('quran_quality_preference', quality);
+            await AsyncStorage.setItem('quran_font_preference', font);
             await AsyncStorage.setItem('quran_images_downloaded', 'true');
 
             onProgress(1, 'complete');
@@ -147,8 +161,12 @@ export const DownloadService = {
         return await AsyncStorage.getItem('quran_quality_preference');
     },
 
-    getDownloadSize(quality: 'low' | 'mid' | 'high'): string {
-        return DOWNLOAD_SIZES[quality];
+    getDownloadSize(quality: 'low' | 'mid' | 'high', font: FontType = 'diyanet'): string {
+        return DOWNLOAD_SIZES[font]?.[quality] || '';
+    },
+
+    async getFont(): Promise<FontType | null> {
+        return await AsyncStorage.getItem('quran_font_preference') as FontType | null;
     },
 
     async getFreeDiskSpace(): Promise<number> {

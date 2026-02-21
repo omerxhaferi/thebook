@@ -51,12 +51,12 @@ export const ThemeProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     const theme = {
-        background: isDarkMode ? '#121212' : '#F5F5F5',
+        background: isDarkMode ? '#121212' : '#F8F7F5',
         text: isDarkMode ? '#FFFFFF' : '#000000',
         card: isDarkMode ? '#1E1E1E' : '#FFFFFF',
         border: isDarkMode ? '#333333' : '#E0E0E0',
-        primary: '#4CAF50',
-        secondaryText: isDarkMode ? '#AAAAAA' : '#666666',
+        primary: '#2E7D32',
+        secondaryText: isDarkMode ? '#B0B0B0' : '#666666',
         tint: isDarkMode ? '#FFFFFF' : '#000000',
     };
 

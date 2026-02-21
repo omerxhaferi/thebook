@@ -2,6 +2,7 @@ import { useTheme } from '@/app/context/ThemeContext';
 import DownloadModal from '@/components/DownloadModal';
 import { getJuzNumber, getSurahsOnPage } from '@/constants/surahs';
 import { DownloadService } from '@/services/DownloadService';
+import { StatsService } from '@/services/StatsService';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
@@ -53,7 +54,6 @@ const SAJDAH_PAGES = [
   294, // al-Isra, 17:109
   310, // Maryam, 19:58
   335, // al-Hajj, 22:18
-  342, // al-Hajj, 22:77
   366, // al-Furqan, 25:60
   380, // an-Naml, 27:26
   417, // as-Sajdah, 32:15
@@ -198,7 +198,8 @@ const PageItem = React.memo(({
   currentRow,
   isDarkMode,
   useLocalImages,
-  quality
+  quality,
+  font
 }: {
   item: typeof PAGES[0],
   index: number,
@@ -209,7 +210,8 @@ const PageItem = React.memo(({
   currentRow: number,
   isDarkMode: boolean,
   useLocalImages: boolean,
-  quality: string | null
+  quality: string | null,
+  font: string | null
 }) => {
   const scrollViewRef = useRef<ScrollView>(null);
   const [imageHeight, setImageHeight] = useState(0);
@@ -220,10 +222,10 @@ const PageItem = React.memo(({
     if (useLocalImages) {
       // Use jpg extension as that's what we expect from the zip
       // Add quality param to bust cache when quality changes
-      return { uri: Paths.document.uri.replace(/\/$/, '') + '/quran_pages/' + item.name + '.jpg?q=' + (quality || 'none') };
+      return { uri: Paths.document.uri.replace(/\/$/, '') + '/quran_pages/' + item.name + '.jpg?q=' + (quality || 'none') + '&f=' + (font || 'none') };
     }
     return null;
-  }, [useLocalImages, item.name, quality]);
+  }, [useLocalImages, item.name, quality, font]);
 
   // Animation value for current row (0-15)
   const rowProgress = useSharedValue(currentRow);
@@ -356,6 +358,7 @@ export default function ReaderScreen() {
   const [rowHighlighterEnabled, setRowHighlighterEnabled] = useState(false);
   const [useLocalImages, setUseLocalImages] = useState(false);
   const [quality, setQuality] = useState<string | null>(null);
+  const [font, setFont] = useState<string | null>(null);
   const dimensions = Dimensions.get('window');
   const [screenWidth, setScreenWidth] = useState(dimensions.width);
   const [contentWidth, setContentWidth] = useState(dimensions.width);
@@ -375,6 +378,7 @@ export default function ReaderScreen() {
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const appState = useRef<AppStateStatus>(AppState.currentState);
   const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sessionFinalizedRef = useRef(false);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -406,6 +410,8 @@ export default function ReaderScreen() {
           setUseLocalImages(isDownloaded);
           const q = await DownloadService.getQuality();
           setQuality(q);
+          const f = await DownloadService.getFont();
+          setFont(f);
 
         } catch (error) {
           console.error('Error loading settings in Reader:', error);
@@ -483,6 +489,36 @@ export default function ReaderScreen() {
     persistTimeoutRef.current = setTimeout(() => {
       persistSession();
     }, 200);
+  }, [persistSession]);
+
+  const finalizeSession = useCallback(async () => {
+    if (sessionFinalizedRef.current) return;
+    sessionFinalizedRef.current = true;
+
+    await persistSession();
+
+    if (
+      sessionStartTimeRef.current !== null &&
+      sessionStartPageRef.current !== null &&
+      latestPageRef.current !== null
+    ) {
+      const elapsedMs = Date.now() - sessionStartTimeRef.current;
+      if (elapsedMs < 5000) return;
+
+      const durationMinutes = Math.max(1, Math.round(elapsedMs / 60000));
+      const pagesRead = Math.max(0, Math.abs(latestPageRef.current - sessionStartPageRef.current));
+      const surahs = getSurahsOnPage(latestPageRef.current);
+      const surahName = surahs.length > 0 ? surahs[0].englishName : 'Unknown';
+
+      await StatsService.logSession({
+        timestamp: Date.now(),
+        durationMinutes,
+        pagesRead,
+        startPage: sessionStartPageRef.current,
+        endPage: latestPageRef.current,
+        surah: surahName,
+      });
+    }
   }, [persistSession]);
 
   const updateSessionProgress = useCallback((pageNumber: number) => {
@@ -564,7 +600,12 @@ export default function ReaderScreen() {
     }
   };
 
-  // Keep a fresh ref to the handler
+  // Keep fresh refs to handlers so useEffects don't re-run when callbacks recreate
+  const updateSessionProgressRef = useRef(updateSessionProgress);
+  useEffect(() => {
+    updateSessionProgressRef.current = updateSessionProgress;
+  }, [updateSessionProgress]);
+
   const handleRowChangeRef = useRef(handleRowChange);
   useEffect(() => {
     handleRowChangeRef.current = handleRowChange;
@@ -590,17 +631,22 @@ export default function ReaderScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      // When leaving the reader (blur), persist any progress immediately
+      sessionFinalizedRef.current = false;
       return () => {
-        persistSession();
+        finalizeSession();
       };
-    }, [persistSession])
+    }, [finalizeSession])
   );
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextStatus => {
       if (appState.current === 'active' && nextStatus.match(/inactive|background/)) {
-        persistSession();
+        finalizeSession();
+      }
+      if (appState.current.match(/inactive|background/) && nextStatus === 'active') {
+        sessionFinalizedRef.current = false;
+        sessionStartedRef.current = false;
+        sessionStartTimeRef.current = null;
       }
       appState.current = nextStatus;
     });
@@ -610,9 +656,9 @@ export default function ReaderScreen() {
         clearTimeout(persistTimeoutRef.current);
       }
       subscription.remove();
-      persistSession();
+      finalizeSession();
     };
-  }, [persistSession]);
+  }, [finalizeSession]);
 
   useEffect(() => {
     // If a page number is provided, try to scroll to it
@@ -695,7 +741,7 @@ export default function ReaderScreen() {
           return s.englishName;
         });
         setCurrentSurahs(surahNames);
-        updateSessionProgress(pageNum);
+        updateSessionProgressRef.current(pageNum);
 
         // Small delay to ensure FlatList is ready
         setTimeout(() => {
@@ -728,9 +774,10 @@ export default function ReaderScreen() {
         return s.englishName;
       });
       setCurrentSurahs(surahNames);
-      updateSessionProgress(1);
+      updateSessionProgressRef.current(1);
     }
-  }, [page, updateSessionProgress]);
+    // Only re-run when the page URL param changes, not when callbacks recreate
+  }, [page]);
 
   const onViewableItemsChanged = useCallback(({ viewableItems }: any) => {
     if (viewableItems.length > 0) {
@@ -746,9 +793,9 @@ export default function ReaderScreen() {
         return s.englishName;
       });
       setCurrentSurahs(surahNames);
-      updateSessionProgress(pageNumber);
+      updateSessionProgressRef.current(pageNumber);
     }
-  }, [updateSessionProgress]);
+  }, []);
 
   const viewabilityConfig = useRef({
     itemVisiblePercentThreshold: 50,
@@ -781,9 +828,10 @@ export default function ReaderScreen() {
         isDarkMode={isDarkMode}
         useLocalImages={useLocalImages}
         quality={quality}
+        font={font}
       />
     );
-  }, [screenWidth, contentWidth, isLandscape, rowHighlighterEnabled, currentRow, isDarkMode, useLocalImages]);
+  }, [screenWidth, contentWidth, isLandscape, rowHighlighterEnabled, currentRow, isDarkMode, useLocalImages, quality, font]);
 
   return (
     <View style={[styles.container, { backgroundColor: isDarkMode ? theme.background : '#fefce5' }]}>
@@ -797,7 +845,7 @@ export default function ReaderScreen() {
       <SafeAreaView style={[styles.topControls, { backgroundColor: isDarkMode ? theme.background : '#fefce5' }]} edges={['top', 'left', 'right']}>
         {/* Left: Home Button */}
         <TouchableOpacity onPress={() => router.back()} style={styles.homeButton}>
-          <Ionicons name="home" size={24} color={'#43a746'} />
+          <Ionicons name="home" size={24} color={theme.primary} />
         </TouchableOpacity>
 
         {/* Center: Page Indicator with Navigation Arrows */}
@@ -811,7 +859,7 @@ export default function ReaderScreen() {
             <Ionicons
               name="chevron-back"
               size={32}
-              color={'#43a746'}
+              color={theme.primary}
             />
           </TouchableOpacity>
 
@@ -861,7 +909,7 @@ export default function ReaderScreen() {
             <Ionicons
               name="chevron-forward"
               size={32}
-              color={'#43a746'}
+              color={theme.primary}
             />
           </TouchableOpacity>
         </View>
@@ -931,6 +979,8 @@ export default function ReaderScreen() {
           setUseLocalImages(isDownloaded);
           const q = await DownloadService.getQuality();
           setQuality(q);
+          const f = await DownloadService.getFont();
+          setFont(f);
         }}
         onCancel={() => setShowDownloadModal(false)}
       />
@@ -989,13 +1039,13 @@ const styles = StyleSheet.create({
   },
   surahIndicator: {
     color: '#000',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
     marginBottom: 2,
   },
   pageIndicator: {
     color: '#000',
-    fontSize: 14,
+    fontSize: 15,
     opacity: 0.8,
   },
   sajdahBadge: {

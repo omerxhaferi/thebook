@@ -1,5 +1,5 @@
 import { useTheme } from '@/app/context/ThemeContext';
-import { DownloadService } from '@/services/DownloadService';
+import { DownloadService, FontType } from '@/services/DownloadService';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
@@ -28,6 +28,8 @@ export default function SettingsScreen() {
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadStatus, setDownloadStatus] = useState<'idle' | 'downloading' | 'completed'>('idle');
   const [quality, setQuality] = useState<'low' | 'mid' | 'high' | null>(null);
+  const [font, setFont] = useState<FontType | null>(null);
+  const [viewFont, setViewFont] = useState<FontType>('diyanet');
   const [statusMessage, setStatusMessage] = useState('');
 
   useEffect(() => {
@@ -48,17 +50,20 @@ export default function SettingsScreen() {
         setDownloadStatus('completed');
         const q = await DownloadService.getQuality();
         setQuality(q as 'low' | 'mid' | 'high');
+        const f = await DownloadService.getFont();
+        setFont(f || 'diyanet');
+        setViewFont(f || 'diyanet');
       }
     } catch (error) {
       console.error('Error loading settings:', error);
     }
   };
 
-  const handleDownload = async (selectedQuality: 'low' | 'mid' | 'high') => {
+  const handleDownload = async (selectedQuality: 'low' | 'mid' | 'high', selectedFont: FontType = font || 'diyanet') => {
     try {
       if (downloadStatus === 'downloading') return;
 
-      const size = DownloadService.getDownloadSize(selectedQuality);
+      const size = DownloadService.getDownloadSize(selectedQuality, selectedFont);
       Alert.alert(
         t('confirmDownload'),
         t('confirmDownloadDesc', { size }),
@@ -68,6 +73,7 @@ export default function SettingsScreen() {
             text: t('download'),
             onPress: async () => {
               setQuality(selectedQuality);
+              setFont(selectedFont);
               setDownloadStatus('downloading');
               setDownloadProgress(0);
               setStatusMessage('starting');
@@ -75,10 +81,11 @@ export default function SettingsScreen() {
               await DownloadService.downloadAndUnzip(selectedQuality, (progress, message) => {
                 setDownloadProgress(progress);
                 setStatusMessage(message);
-              });
+              }, selectedFont);
 
               setDownloadStatus('completed');
               setStatusMessage('downloadSuccess');
+              await loadSettings();
             }
           }
         ]
@@ -117,9 +124,12 @@ export default function SettingsScreen() {
       <StatusBar barStyle={isDarkMode ? "light-content" : "dark-content"} backgroundColor={theme.background} />
 
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={28} color={theme.primary} />
+      <View style={[styles.header, { backgroundColor: theme.background }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={[styles.backBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}
+        >
+          <Ionicons name="arrow-back" size={22} color={theme.primary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>{t('settings')}</Text>
         <View style={styles.headerPlaceholder} />
@@ -159,80 +169,115 @@ export default function SettingsScreen() {
         </View>
 
 
-        {/* Quran Quality Settings */}
+        {/* Font Style Settings */}
         <View style={[styles.settingItem, { backgroundColor: theme.card, flexDirection: 'column', alignItems: 'flex-start' }]}>
-          <Text style={[styles.settingLabel, { color: theme.text, marginBottom: 12 }]}>{t('quranPageQuality') || 'Quran Page Quality'}</Text>
+          <Text style={[styles.settingLabel, { color: theme.text, marginBottom: 12 }]}>{t('fontStyle')}</Text>
 
-          <View style={{ width: '100%', gap: 8, marginBottom: 12 }}>
-            <TouchableOpacity
-              style={[styles.qualityButton, {
-                backgroundColor: quality === 'low' ? theme.primary : theme.background,
-                borderColor: theme.border,
-                borderWidth: 1,
-                paddingVertical: 14 // Increased padding for vertical layout
-              }]}
-              onPress={() => statusMessage !== 'downloading' && handleDownload('low')}
-              disabled={downloadStatus === 'downloading'}
-            >
-              <Text style={[styles.qualityButtonText, { color: quality === 'low' ? '#FFF' : theme.text }]}>
-                {t('low') || 'Low'} ({DownloadService.getDownloadSize('low')})
-              </Text>
-              {quality === 'low' && downloadStatus === 'completed' && (
-                <Ionicons name="checkmark-circle" size={16} color="#FFF" style={{ marginLeft: 4 }} />
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.qualityButton, {
-                backgroundColor: quality === 'mid' ? theme.primary : theme.background,
-                borderColor: theme.border,
-                borderWidth: 1,
-                paddingVertical: 14
-              }]}
-              onPress={() => statusMessage !== 'downloading' && handleDownload('mid')}
-              disabled={downloadStatus === 'downloading'}
-            >
-              <Text style={[styles.qualityButtonText, { color: quality === 'mid' ? '#FFF' : theme.text }]}>
-                {t('mid') || 'Mid'} ({DownloadService.getDownloadSize('mid')})
-              </Text>
-              {quality === 'mid' && downloadStatus === 'completed' && (
-                <Ionicons name="checkmark-circle" size={16} color="#FFF" style={{ marginLeft: 4 }} />
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.qualityButton, {
-                backgroundColor: quality === 'high' ? theme.primary : theme.background,
-                borderColor: theme.border,
-                borderWidth: 1,
-                paddingVertical: 14
-              }]}
-              onPress={() => statusMessage !== 'downloading' && handleDownload('high')}
-              disabled={downloadStatus === 'downloading'}
-            >
-              <Text style={[styles.qualityButtonText, { color: quality === 'high' ? '#FFF' : theme.text }]}>
-                {t('high') || 'High'} ({DownloadService.getDownloadSize('high')})
-              </Text>
-              {quality === 'high' && downloadStatus === 'completed' && (
-                <Ionicons name="checkmark-circle" size={16} color="#FFF" style={{ marginLeft: 4 }} />
-              )}
-            </TouchableOpacity>
+          <View style={{ flexDirection: 'row', width: '100%', gap: 8 }}>
+            {(['diyanet', 'husrev'] as FontType[]).map((f) => {
+              const isViewing = viewFont === f;
+              const isDownloaded = font === f && downloadStatus === 'completed';
+              return (
+                <TouchableOpacity
+                  key={f}
+                  style={[styles.qualityButton, {
+                    backgroundColor: isViewing ? theme.primary : theme.background,
+                    borderColor: theme.border,
+                    borderWidth: 1,
+                    paddingVertical: 14,
+                  }]}
+                  onPress={() => {
+                    if (downloadStatus === 'downloading') return;
+                    setViewFont(f);
+                  }}
+                  disabled={downloadStatus === 'downloading'}
+                >
+                  <Text style={[styles.qualityButtonText, { color: isViewing ? '#FFF' : theme.text }]}>
+                    {t(f)}
+                  </Text>
+                  {isDownloaded && (
+                    <Ionicons name="checkmark-circle" size={16} color={isViewing ? '#FFF' : theme.primary} style={{ marginLeft: 4 }} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
-
-          {downloadStatus === 'downloading' && (
-            <View style={{ width: '100%', marginTop: 8 }}>
-              <Text style={{ color: theme.secondaryText, marginBottom: 4, fontSize: 12 }}>{t(statusMessage)} ({Math.round(downloadProgress * 100)}%)</Text>
-              <View style={{ height: 4, backgroundColor: theme.border, borderRadius: 2, overflow: 'hidden' }}>
-                <View style={{ width: `${downloadProgress * 100}%`, height: '100%', backgroundColor: theme.primary }} />
-              </View>
-            </View>
-          )}
-          {downloadStatus === 'completed' && statusMessage !== 'starting' && (
-            <Text style={{ color: theme.primary, fontSize: 12, marginTop: 4 }}>
-              <Ionicons name="checkmark" /> {t('downloadSuccess') || 'Downloaded'}
-            </Text>
-          )}
         </View>
+
+        {/* Quran Quality Settings — for Diyanet */}
+        {viewFont === 'diyanet' && (
+          <View style={[styles.settingItem, { backgroundColor: theme.card, flexDirection: 'column', alignItems: 'flex-start' }]}>
+            <Text style={[styles.settingLabel, { color: theme.text, marginBottom: 12 }]}>{t('quranPageQuality') || 'Quran Page Quality'}</Text>
+
+            <View style={{ width: '100%', gap: 8, marginBottom: 12 }}>
+              {(['low', 'mid', 'high'] as const).map((q) => {
+                const isActive = font === 'diyanet' && quality === q && downloadStatus === 'completed';
+                return (
+                  <TouchableOpacity
+                    key={q}
+                    style={[styles.qualityButton, {
+                      backgroundColor: isActive ? theme.primary : theme.background,
+                      borderColor: theme.border,
+                      borderWidth: 1,
+                      paddingVertical: 14,
+                    }]}
+                    onPress={() => statusMessage !== 'downloading' && handleDownload(q, 'diyanet')}
+                    disabled={downloadStatus === 'downloading'}
+                  >
+                    <Text style={[styles.qualityButtonText, { color: isActive ? '#FFF' : theme.text }]}>
+                      {t(q)} ({DownloadService.getDownloadSize(q, 'diyanet')})
+                    </Text>
+                    {isActive && (
+                      <Ionicons name="checkmark-circle" size={16} color="#FFF" style={{ marginLeft: 4 }} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {downloadStatus === 'downloading' && (
+              <View style={{ width: '100%', marginTop: 8 }}>
+                <Text style={{ color: theme.secondaryText, marginBottom: 4, fontSize: 12 }}>{t(statusMessage)} ({Math.round(downloadProgress * 100)}%)</Text>
+                <View style={{ height: 4, backgroundColor: theme.border, borderRadius: 2, overflow: 'hidden' }}>
+                  <View style={{ width: `${downloadProgress * 100}%`, height: '100%', backgroundColor: theme.primary }} />
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Husrev download option */}
+        {viewFont === 'husrev' && (
+          <View style={[styles.settingItem, { backgroundColor: theme.card, flexDirection: 'column', alignItems: 'flex-start' }]}>
+            <TouchableOpacity
+              style={[styles.qualityButton, {
+                backgroundColor: font === 'husrev' && downloadStatus === 'completed' ? theme.primary : theme.background,
+                borderColor: theme.border,
+                borderWidth: 1,
+                paddingVertical: 14,
+                width: '100%',
+              }]}
+              onPress={() => downloadStatus !== 'downloading' && handleDownload('high', 'husrev')}
+              disabled={downloadStatus === 'downloading'}
+            >
+              <Text style={[styles.qualityButtonText, { color: font === 'husrev' && downloadStatus === 'completed' ? '#FFF' : theme.text }]}>
+                {t('high')} ({DownloadService.getDownloadSize('high', 'husrev')})
+              </Text>
+              {font === 'husrev' && downloadStatus === 'completed' && (
+                <Ionicons name="checkmark-circle" size={16} color="#FFF" style={{ marginLeft: 4 }} />
+              )}
+            </TouchableOpacity>
+
+            {downloadStatus === 'downloading' && (
+              <View style={{ width: '100%', marginTop: 12 }}>
+                <Text style={{ color: theme.secondaryText, marginBottom: 4, fontSize: 12 }}>{t(statusMessage)} ({Math.round(downloadProgress * 100)}%)</Text>
+                <View style={{ height: 4, backgroundColor: theme.border, borderRadius: 2, overflow: 'hidden' }}>
+                  <View style={{ width: `${downloadProgress * 100}%`, height: '100%', backgroundColor: theme.primary }} />
+                </View>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Row Highlighter Setting */}
         <View style={[styles.settingItem, { backgroundColor: theme.card, shadowColor: isDarkMode ? '#000' : '#000' }]}>
@@ -284,10 +329,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: '#FFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    paddingVertical: 14,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 20,
@@ -295,7 +344,7 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   headerPlaceholder: {
-    width: 28,
+    width: 40,
   },
   content: {
     flex: 1,
@@ -308,7 +357,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFF',
     padding: 20,
-    borderRadius: 12,
+    borderRadius: 16,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -327,7 +376,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   settingDescription: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#666',
   },
   qualityButton: {

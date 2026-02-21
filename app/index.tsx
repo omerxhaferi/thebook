@@ -22,6 +22,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { QuranBookIcon, RubElHizbIcon } from '@/components/IslamicIcons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -111,8 +112,27 @@ export default function HomeScreen() {
     }, [])
   );
 
+  const BOOKMARK_COLORS = [
+    '#2E7D32', // deep green
+    '#1565C0', // royal blue
+    '#6A1B9A', // plum
+    '#C62828', // burgundy
+    '#00695C', // teal
+    '#4527A0', // indigo
+    '#AD1457', // berry
+    '#E65100', // burnt orange
+    '#283593', // navy
+    '#2E4057', // slate
+    '#5D4037', // walnut
+    '#00838F', // dark cyan
+    '#558B2F', // olive
+    '#8E4585', // orchid
+    '#37474F', // charcoal
+    '#BF360C', // rust
+  ];
+
   const generateRandomColor = () => {
-    return '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+    return BOOKMARK_COLORS[Math.floor(Math.random() * BOOKMARK_COLORS.length)];
   };
 
   const getFormattedDate = (timestamp?: number, fallbackDate?: string) => {
@@ -327,17 +347,31 @@ export default function HomeScreen() {
         <View style={[
           styles.header,
           {
-            backgroundColor: theme.card,
+            backgroundColor: theme.background,
             paddingLeft: Math.max(20, insets.left),
             paddingRight: Math.max(20, insets.right)
           }
         ]}>
-          <TouchableOpacity onPress={() => setMenuModalVisible(true)}>
-            <Ionicons name="menu" size={32} color={theme.primary} />
+          <TouchableOpacity
+            onPress={() => setMenuModalVisible(true)}
+            style={[styles.iconBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}
+          >
+            <Ionicons name="menu" size={26} color={theme.primary} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/settings')}>
-            <Ionicons name="settings" size={28} color={theme.primary} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <TouchableOpacity
+              onPress={() => router.push('/stats')}
+              style={[styles.iconBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}
+            >
+              <Ionicons name="stats-chart" size={22} color={theme.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push('/settings')}
+              style={[styles.iconBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}
+            >
+              <Ionicons name="settings" size={22} color={theme.primary} />
+            </TouchableOpacity>
+          </View>
         </View>
         <ScrollView
           style={styles.content}
@@ -364,11 +398,11 @@ export default function HomeScreen() {
                     <Text style={styles.startReadingDesc}>{t('startReadingDesc')}</Text>
                   </View>
                   <View style={styles.startReadingIconContainer}>
-                    <Ionicons name="book" size={40} color="rgba(255,255,255,0.9)" />
+                    <QuranBookIcon size={40} color="rgba(255,255,255,0.9)" />
                   </View>
                 </View>
                 <View style={styles.startReadingBackgroundIcon}>
-                  <Ionicons name="apps" size={120} color="rgba(255,255,255,0.1)" />
+                  <RubElHizbIcon size={120} color="rgba(255,255,255,0.15)" />
                 </View>
               </TouchableOpacity>
             ) : (
@@ -461,7 +495,8 @@ export default function HomeScreen() {
             styles.fab,
             {
               bottom: 30 + insets.bottom,
-              right: 20 + insets.right
+              right: 20 + insets.right,
+              backgroundColor: theme.primary,
             }
           ]}
           onPress={() => setModalVisible(true)}
@@ -490,7 +525,7 @@ export default function HomeScreen() {
                 router.push('/surahs');
               }}
             >
-              <Ionicons name="list" size={24} color={theme.primary} style={{ marginRight: 15 }} />
+              <QuranBookIcon size={24} color={theme.primary} style={{ marginRight: 15 }} />
               <Text style={[styles.menuText, { color: theme.text }]}>{t('listSurahs')}</Text>
             </TouchableOpacity>
 
@@ -501,7 +536,7 @@ export default function HomeScreen() {
                 router.push('/juz');
               }}
             >
-              <Ionicons name="grid" size={24} color={theme.primary} style={{ marginRight: 15 }} />
+              <RubElHizbIcon size={24} color={theme.primary} style={{ marginRight: 15 }} />
               <Text style={[styles.menuText, { color: theme.text }]}>{t('listJuz')}</Text>
             </TouchableOpacity>
           </View>
@@ -517,10 +552,17 @@ export default function HomeScreen() {
       >
         <View style={styles.modalOverlay}>
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior="padding"
             style={styles.modalContainer}
           >
-            <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+            <ScrollView
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              style={{ width: '85%' }}
+              contentContainerStyle={{ flexGrow: 0 }}
+            >
+            <View style={[styles.modalContent, { backgroundColor: theme.card, width: '100%' }]}>
               {!editingBookmarkId && (
                 <View style={[styles.segmentContainer, { marginBottom: 16, backgroundColor: theme.background }]}>
                   <TouchableOpacity
@@ -626,6 +668,7 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
             </View>
+            </ScrollView>
           </KeyboardAvoidingView>
         </View>
       </Modal>
@@ -651,8 +694,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: '#FFF',
+    paddingVertical: 14,
+  },
+  iconBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   content: {
     flex: 1,
@@ -662,7 +711,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   sectionTitle: {
-    fontSize: 21,
+    fontSize: 22,
     fontWeight: '600',
     color: '#000',
     marginBottom: 12,
@@ -727,7 +776,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   label: {
-    fontSize: 16,
+    fontSize: 17,
     color: '#666',
     marginBottom: 8,
   },
@@ -737,7 +786,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   dateText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#999',
   },
   lastReadInfo: {
@@ -788,7 +837,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   bookmarkLabel: {
-    fontSize: 16,
+    fontSize: 17,
     color: '#666',
     marginBottom: 8,
   },
