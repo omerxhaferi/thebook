@@ -39,7 +39,7 @@ export default function JuzScreen() {
             <View style={styles.juzInfo}>
                 <Text style={[styles.juzTitle, { color: theme.text }]}>{t('juz')} {item.number}</Text>
                 <Text style={[styles.juzMeta, { color: theme.secondaryText }]}>
-                    {t('startsAtPage')} {item.startPage}
+                    {t('startsAtPage', { page: item.startPage })}
                 </Text>
             </View>
 

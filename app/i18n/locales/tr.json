@@ -93,7 +93,7 @@
     "default": "Basit",
     "type": "Tür",
     "juzTitle": "Cüz",
-    "startsAtPage": "Sayfada başlıyor",
+    "startsAtPage": "Sayfa {{page}}",
     "edit": "Ayarla",
     "chooseFontStyle": "Yazı Stilini Seçin",
     "chooseFontStyleDesc": "Kuran sayfaları için yazı stilini seçin.",

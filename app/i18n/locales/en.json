@@ -93,7 +93,7 @@
     "default": "Default",
     "type": "Type",
     "juzTitle": "Juz",
-    "startsAtPage": "Starts at page",
+    "startsAtPage": "Starts at page {{page}}",
     "edit": "Edit",
     "chooseFontStyle": "Choose Font Style",
     "chooseFontStyleDesc": "Select the font style for your Quran pages.",

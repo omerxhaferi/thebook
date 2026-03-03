@@ -7,12 +7,12 @@ export type FontType = 'diyanet' | 'husrev';
 const QURAN_PAGES_DIR = FileSystem.documentDirectory + 'quran_pages/';
 const ZIP_URLS = {
     diyanet: {
-        low: 'https://omahapp-deployments.s3.eu-central-1.amazonaws.com/low.zip',
-        mid: 'https://omahapp-deployments.s3.eu-central-1.amazonaws.com/mid.zip',
-        high: 'https://omahapp-deployments.s3.eu-central-1.amazonaws.com/high.zip',
+        low: 'https://objectstorage.eu-milan-1.oraclecloud.com/n/axbud2geqcpn/b/bucket-20260302-2122/o/low.zip',
+        mid: 'https://objectstorage.eu-milan-1.oraclecloud.com/n/axbud2geqcpn/b/bucket-20260302-2122/o/mid.zip',
+        high: 'https://objectstorage.eu-milan-1.oraclecloud.com/n/axbud2geqcpn/b/bucket-20260302-2122/o/high.zip',
     },
     husrev: {
-        high: 'https://omahapp-deployments.s3.eu-central-1.amazonaws.com/h_high.zip',
+        high: 'https://objectstorage.eu-milan-1.oraclecloud.com/n/axbud2geqcpn/b/bucket-20260302-2122/o/h_high.zip',
     },
 };
 

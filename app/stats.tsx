@@ -1,5 +1,5 @@
 import { useTheme } from '@/app/context/ThemeContext';
-import { getSurahsOnPage, SURAHS } from '@/constants/surahs';
+import { getSurahsInRange, getSurahsOnPage, Surah } from '@/constants/surahs';
 import { MonthData, ReadingSession, StatsService } from '@/services/StatsService';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -92,12 +92,14 @@ export default function StatsScreen() {
     setDaySessions(sessions);
   };
 
-  const getTranslatedSurahName = (englishName: string) => {
-    const surah = SURAHS.find(s => s.englishName === englishName);
-    if (!surah) return englishName;
-    if (i18n.language === 'sq') return surah.albanianName || englishName;
-    if (i18n.language === 'tr') return surah.turkishName || englishName;
+  const translateSurah = (surah: Surah) => {
+    if (i18n.language === 'sq') return surah.albanianName || surah.englishName;
+    if (i18n.language === 'tr') return surah.turkishName || surah.englishName;
     return surah.englishName;
+  };
+
+  const getSurahNamesForRange = (startPage: number, endPage: number) => {
+    return getSurahsInRange(startPage, endPage).map(translateSurah).join(', ');
   };
 
   const formatSessionTime = (timestamp: number): string => {
@@ -166,7 +168,7 @@ export default function StatsScreen() {
 
     const pagesRead = Math.abs(endPage - startPage);
     const surahs = getSurahsOnPage(endPage);
-    const surahName = surahs.length > 0 ? surahs[0].englishName : 'Unknown';
+    const surahName = surahs.length > 0 ? surahs[0].englishName : '';
 
     if (editingSession) {
       await StatsService.updateSession(editingSession.id, {
@@ -375,7 +377,7 @@ export default function StatsScreen() {
                     <TouchableOpacity key={session.id} style={[styles.sessionCard, { backgroundColor: theme.background }]} onPress={() => openEditSession(session)} activeOpacity={0.7}>
                       <View style={styles.sessionLeft}>
                         <Text style={[styles.sessionSurah, { color: theme.text }]} numberOfLines={1}>
-                          {getTranslatedSurahName(session.surah)}
+                          {getSurahNamesForRange(session.startPage, session.endPage)}
                         </Text>
                         <Text style={[styles.sessionPages, { color: theme.secondaryText }]}>
                           {t('page')} {session.startPage}–{session.endPage}

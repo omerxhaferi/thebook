@@ -93,7 +93,7 @@
     "default": "Standard",
     "type": "Lloji",
     "juzTitle": "Xhuz",
-    "startsAtPage": "Fillon në faqen",
+    "startsAtPage": "Fillon në faqen {{page}}",
     "edit": "Edito",
     "chooseFontStyle": "Zgjidhni Stilin e Shkrimit",
     "chooseFontStyleDesc": "Zgjidhni stilin e shkrimit për faqet e Kuranit.",

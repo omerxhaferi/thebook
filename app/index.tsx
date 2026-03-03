@@ -1,6 +1,6 @@
 import { useTheme } from '@/app/context/ThemeContext';
 import DownloadModal from '@/components/DownloadModal';
-import { getSurahsOnPage, SURAHS } from '@/constants/surahs';
+import { getSurahsOnPage, Surah, SURAHS } from '@/constants/surahs';
 import { Bookmark, BookmarkService, LastRead } from '@/services/BookmarkService';
 import { DownloadService } from '@/services/DownloadService';
 import { Ionicons } from '@expo/vector-icons';
@@ -158,13 +158,20 @@ export default function HomeScreen() {
     return `${hours}:${minutes}`;
   };
 
+  const translateSurah = (surah: Surah) => {
+    if (i18n.language === 'sq') return surah.albanianName || surah.englishName;
+    if (i18n.language === 'tr') return surah.turkishName || surah.englishName;
+    return surah.englishName;
+  };
+
   const getTranslatedSurahName = (englishName: string) => {
     const surah = SURAHS.find(s => s.englishName === englishName);
-    if (!surah) return englishName;
+    if (!surah) return '';
+    return translateSurah(surah);
+  };
 
-    if (i18n.language === 'sq') return surah.albanianName || englishName;
-    if (i18n.language === 'tr') return surah.turkishName || englishName;
-    return surah.englishName;
+  const getSurahNamesForPage = (page: number) => {
+    return getSurahsOnPage(page).map(translateSurah).join(', ');
   };
 
   const handleEditBookmark = (bookmark: Bookmark) => {
@@ -228,7 +235,7 @@ export default function HomeScreen() {
 
       // Get the Surah name for this page
       const surahs = getSurahsOnPage(effectivePage);
-      const surahName = surahs.length > 0 ? surahs[0].englishName : 'Unknown';
+      const surahName = surahs.length > 0 ? surahs[0].englishName : '';
 
       if (editingBookmarkId) {
         const existingBookmark = bookmarks.find(b => b.id === editingBookmarkId);
@@ -413,7 +420,7 @@ export default function HomeScreen() {
               >
                 <View style={styles.row}>
                   <View style={styles.infoColumn}>
-                    <Text style={[styles.label, { color: theme.secondaryText }]}>{t('sura')}: {getTranslatedSurahName(lastRead?.sura || 'Al-Fatihah')}</Text>
+                    <Text style={[styles.label, { color: theme.secondaryText }]}>{t('sura')}: {getSurahNamesForPage(lastRead?.page || 2)}</Text>
                     <View style={styles.dateTime}>
                       <Ionicons name="calendar" size={16} color="#999" />
                       <Text style={styles.dateText}>{getFormattedDate(lastRead?.timestamp, lastRead?.date)}</Text>
@@ -458,7 +465,7 @@ export default function HomeScreen() {
                     <Text style={[styles.bookmarkName, { color: theme.text }]}>{bookmark.name}</Text>
                     <View style={styles.row}>
                       <View style={styles.infoColumn}>
-                        <Text style={[styles.bookmarkLabel, { color: theme.secondaryText }]}>{t('sura')}: {getTranslatedSurahName(bookmark.sura)}</Text>
+                        <Text style={[styles.bookmarkLabel, { color: theme.secondaryText }]}>{t('sura')}: {getSurahNamesForPage(bookmark.page)}</Text>
                         <View style={styles.dateTime}>
                           <Ionicons name="calendar" size={16} color="#999" />
                           <Text style={styles.dateText}>{getFormattedDate(bookmark.timestamp, bookmark.date)}</Text>

@@ -6,7 +6,9 @@
       "Bash(npx expo uninstall:*)",
       "Bash(npm uninstall:*)",
       "Bash(npx expo prebuild:*)",
-      "Bash(./gradlew app:assembleRelease:*)"
+      "Bash(./gradlew app:assembleRelease:*)",
+      "WebFetch(domain:api.alquran.cloud)",
+      "WebFetch(domain:api.quran.com)"
     ]
   }
 }
